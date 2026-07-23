@@ -2099,3 +2099,17 @@ body,
 @media (max-width: 640px) {
   .code-highlight { font-size: 13px; }
 }
+
+/* Show code exactly as typed: Cascadia Code ligatures merge != <= -> into single
+   glyphs, which confuses beginners — disable them everywhere code is displayed. */
+.code-input,
+.code-highlight,
+.code-prefix,
+.code-suggestions,
+.CodeMirror,
+code,
+pre,
+kbd {
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0, "dlig" 0;
+}
