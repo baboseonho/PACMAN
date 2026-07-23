@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Blue arcade ghost</title>
+  <path d="M7 55V31C7 17.2 18.2 6 32 6s25 11.2 25 25v24l-8-6-8 7-9-7-9 7-8-7-8 6Z" fill="#4D9CC6" stroke="#1B2942" stroke-width="2.5" stroke-linejoin="round"/>
+  <ellipse cx="24" cy="29" rx="7" ry="9" fill="#FFFDF8"/>
+  <ellipse cx="42" cy="29" rx="7" ry="9" fill="#FFFDF8"/>
+  <circle cx="26" cy="31" r="3.5" fill="#1B2942"/>
+  <circle cx="44" cy="31" r="3.5" fill="#1B2942"/>
+</svg>
