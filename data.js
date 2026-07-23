@@ -221,22 +221,22 @@ const COURSE_MISSIONS = [
   },
   {
     id: "integration", phase: "11 · INTEGRATION", nav: "FSM + Dijkstra", title: "Combine decision and pathfinding",
-    lead: "FSM answers when to chase. Dijkstra answers which path to take. A smart monster runs pathfinding only while its current state is CHASE.",
-    icon: "AI", conceptTitle: "Decision layer + navigation layer",
-    conceptText: "First update the state from distance. Then, only in CHASE, calculate a path, verify the next tile, and move one step.", lab: "path",
+    lead: "FSM answers when to chase. Dijkstra answers which path to take. A smart monster runs pathfinding only while its state is CHASE — and you already wrote that pathfinding step as `update_ghost()` in Mission 10.",
+    icon: "AI", conceptTitle: "Decision layer + navigation layer (reuse!)",
+    conceptText: "First update the state from distance. Then, only in CHASE, reuse `update_ghost()` from Mission 10 — it already recalculates the path, checks the length, and returns the next tile. Calling tested functions instead of retyping their code is how real game code is built.", lab: "path",
     codeReference: [
       ["get_distance(...)", "Calculates the value used by the FSM transition conditions."],
       ["ghost.state", "Stores the decision made by the FSM."],
-      ["find_path(...)", "Calculates a route; call it only while the state is CHASE."],
-      ["len(path) > 1", "Guards path[1] so a missing route cannot cause an index error."],
-      ["ghost_pos = path[1]", "Moves the ghost exactly one tile along the route."]
+      ["update_ghost(map_data, ghost_pos, pacman_pos)", "Your Mission 10 function: recalculates the path and returns the next tile, or the current position when no route exists."],
+      ["ghost_pos = update_ghost(...)", "Moves the ghost exactly one tile by reusing the function instead of retyping find_path and the length check."]
     ],
     time: 5,
     task: {
       taskTitle: "Implement the complete smart-monster update", type: "code", validator: "integration",
-      prompt: "Write one update block that selects ATTACK below 50, CHASE below 200, PATROL otherwise, and uses `find_path` plus a length check only in CHASE.",
+      prompt: "Write one update block that selects ATTACK below 50, CHASE below 200, PATROL otherwise, and — only in CHASE — moves the ghost by calling `update_ghost(map_data, ghost_pos, pacman_pos)`.",
       starter: "distance = get_distance(ghost_pos, pacman_pos)\n",
-      hints: ["Finish the FSM before the CHASE movement block.", "The specific `< 50` condition must appear before `< 200`.", "In CHASE: find_path → len(path) > 1 → ghost_pos = path[1]."]
+      success: "Correct. FSM decides when to hunt, and your own Mission 10 function decides where to step — decision layer plus navigation layer, connected by reuse. Your smart monster is complete!",
+      hints: ["Finish the FSM before the CHASE movement block.", "The specific `< 50` condition must appear before `< 200`.", "In CHASE: `ghost_pos = update_ghost(map_data, ghost_pos, pacman_pos)` — the function already handles find_path and the length check."]
     }
   },
   {

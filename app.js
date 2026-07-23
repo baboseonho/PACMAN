@@ -950,8 +950,13 @@
       const state = orderedStates();
       if (!state) return false;
       const chaseBlock = c.lastIndexOf(`${state.target}=="chase"`);
-      const findText = c.slice(chaseBlock).match(/([a-z_]\w*)=find_path\(([a-z_]\w*),([a-z_]\w*),([a-z_]\w*)\)/);
-      if (chaseBlock < 0 || !findText) return false;
+      if (chaseBlock < 0) return false;
+      const afterChase = c.slice(chaseBlock);
+      // Canonical answer: reuse the Mission 10 function inside CHASE.
+      if (/([a-z_]\w*)=update_ghost\(([a-z_]\w*),\1,([a-z_]\w*)\)/.test(afterChase)) return true;
+      // Legacy long form (find_path → length check → path[1]) is still accepted.
+      const findText = afterChase.match(/([a-z_]\w*)=find_path\(([a-z_]\w*),([a-z_]\w*),([a-z_]\w*)\)/);
+      if (!findText) return false;
       const path = escaped(findText[1]), position = escaped(findText[3]);
       const afterFind = c.slice(chaseBlock + findText.index);
       return new RegExp(`len\\(${path}\\)>1`).test(afterFind) && new RegExp(`${position}=${path}\\[1\\]`).test(afterFind);
@@ -1041,9 +1046,9 @@
       const d50 = c.indexOf("distance<50"), d200 = c.indexOf("distance<200");
       need(d50 >= 0 && d200 >= 0 && d50 < d200, "The FSM transition conditions are missing or in the wrong order.");
       need(c.includes('ghost.state=="chase"'), "The CHASE-only navigation condition is missing or incorrect.");
-      need(c.includes("find_path(map_data,ghost_pos,pacman_pos)"), "The pathfinding call inside the navigation block is missing or incorrect.");
-      need(c.includes("len(path)>1"), "The path-length safety check is missing or misplaced.");
-      need(c.includes("ghost_pos=path[1]"), "The one-tile movement step is missing or incorrect.");
+      const hasReuse = c.includes("ghost_pos=update_ghost(map_data,ghost_pos,pacman_pos)");
+      const hasInline = c.includes("find_path(map_data,ghost_pos,pacman_pos)") && c.includes("len(path)>1") && c.includes("ghost_pos=path[1]");
+      need(hasReuse || hasInline, "Inside CHASE, move the ghost with `ghost_pos = update_ghost(map_data, ghost_pos, pacman_pos)` — reuse your Mission 10 function.");
     }
     return [...new Set(issues)];
   }
