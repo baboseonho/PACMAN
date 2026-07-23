@@ -116,23 +116,24 @@ const COURSE_MISSIONS = [
     }
   },
   {
-    id: "cost", phase: "07 · COST MAP", nav: "Movement cost", title: "Not every walkable tile is equally good",
-    lead: "A safe tile can cost 1, a near-wall tile can cost 2, and a wall is blocked. The route with fewer steps is not always the route with the lowest total cost.",
-    icon: "+", conceptTitle: "Shortest distance vs. lowest cost",
-    conceptText: "Dijkstra minimizes the sum of movement costs. Increasing a tile's cost can make the algorithm choose a longer but safer detour.", lab: "path",
+    id: "cost", phase: "07 · COST MAP", nav: "Movement cost", title: "The fastest route is not always the shortest",
+    lead: "A normal tile takes 1 tick to cross, but a sticky SLIME tile takes 2. Cost is the time a tile steals from the ghost — fewer steps can still mean a slower arrival.",
+    icon: "+", conceptTitle: "Cost = time to cross a tile",
+    conceptText: "Navigation apps work the same way: a short road full of traffic loses to a longer, faster road. Dijkstra minimizes total cost, so slime on the shortcut can make a longer detour the fastest route.", lab: "path",
     codeReference: [
       ["get_tile_cost(tile)", "A function that converts a tile type into its movement cost."],
-      ["WALL / NEAR_WALL", "Named constants for two special tile types."],
+      ["WALL / SLIME", "Named constants for two special tile types."],
+      ["cost 2", "The ghost needs two ticks to cross sticky slime, so it enters at half speed."],
       ["None", "Means the wall cannot be entered, rather than giving it a numeric cost."],
       ["return", "Stops the function and sends one result back."]
     ],
     time: 3,
     task: {
       taskTitle: "Implement a tile-cost function", type: "code", validator: "tileCostFunction",
-      prompt: "Write `get_tile_cost(tile)` so WALL returns `None`, NEAR_WALL returns 2, and every other floor tile returns 1.",
+      prompt: "Write `get_tile_cost(tile)` so WALL returns `None`, SLIME returns 2, and every other floor tile returns 1.",
       starter: "def get_tile_cost(tile):\n",
-      success: "Correct. `None` blocks WALL completely, cost 2 makes NEAR_WALL less attractive, and cost 1 keeps normal floor cheapest. Dijkstra adds these values to compare total route cost.",
-      hints: ["Check WALL before returning a numeric cost.", "NEAR_WALL returns 2.", "Return None for WALL, 2 for NEAR_WALL, and 1 otherwise."]
+      success: "Correct. `None` blocks WALL completely, cost 2 makes sticky SLIME twice as slow to cross, and cost 1 keeps normal floor cheapest. Dijkstra adds these ticks to find the fastest arrival — in the Play lab, ghosts now detour around slime.",
+      hints: ["Check WALL before returning a numeric cost.", "SLIME returns 2 because crossing it takes 2 ticks instead of 1.", "Return None for WALL, 2 for SLIME, and 1 otherwise."]
     }
   },
   {
@@ -237,6 +238,24 @@ const COURSE_MISSIONS = [
       starter: "distance = get_distance(ghost_pos, pacman_pos)\n",
       hints: ["Finish the FSM before the CHASE movement block.", "The specific `< 50` condition must appear before `< 200`.", "In CHASE: find_path → len(path) > 1 → ghost_pos = path[1]."]
     }
+  },
+  {
+    id: "playground", phase: "12 · PLAYGROUND", nav: "Bonus: more mazes", title: "Bonus: design levels beyond your Student map",
+    lead: "Your Mission 4 matrix is already playable as the Student map in the Play lab. When you want to try more level ideas, this Build lab lets you design brand-new mazes — now with slime — and play them instantly.",
+    icon: "★", conceptTitle: "Level design is an AI experiment",
+    conceptText: "Every wall you paint changes the graph, and every slime tile changes the cost map. Watch where your ghosts detour — that is Dijkstra reacting to the world you drew.",
+    lab: "build",
+    time: 6,
+    task: {
+      taskTitle: "Bonus: build it, place it, play it", type: "build", validator: "playground",
+      prompt: "Bonus mission — your smart AI is already complete. In the Build lab: pick a size, paint at least 12 wall tiles and 3 slime tiles, place P, G1, and G2 on open tiles, then press Play this map and start your own maze.",
+      success: "Level confirmed. Your FSM decides when the ghosts hunt, and Dijkstra finds the fastest route through the exact walls and slime you painted.",
+      hints: [
+        "Drag across the grid to paint many wall tiles in one stroke.",
+        "Slime is strongest in narrow corridors: a slimed shortcut makes smart ghosts take the long way around.",
+        "Keep both ghosts at least 6 tiles away from Pac-Man, then press Play this map and START GAME."
+      ]
+    }
   }
 ];
 
@@ -256,7 +275,7 @@ const PATH_MAPS = [
   },
   {
     id: "weighted", name: "WEIGHTED",
-    description: "The direct route contains expensive tiles.",
+    description: "The short route crosses deep slime (cost 9).",
     map: [
       "###########",
       "#S1999911G#",

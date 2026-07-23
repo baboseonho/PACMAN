@@ -15,8 +15,10 @@
     hintBtn: $("hintBtn"), hintCount: $("hintCount"), checkBtn: $("checkBtn"), skipBtn: $("skipBtn"), prevBtn: $("prevBtn"), nextBtn: $("nextBtn"),
     themeToggleBtn: $("themeToggleBtn"), themeIcon: $("themeIcon"),
     completeDialog: $("completeDialog"), resultMissions: $("resultMissions"), resultSkipped: $("resultSkipped"), resultHints: $("resultHints"),
-    toast: $("toast"), fsmTab: $("fsmTab"), matrixTab: $("matrixTab"), pathTab: $("pathTab"), playTab: $("playTab"),
-    fsmLab: $("fsmLab"), matrixLab: $("matrixLab"), pathLab: $("pathLab"), playLab: $("playLab"),
+    toast: $("toast"), fsmTab: $("fsmTab"), matrixTab: $("matrixTab"), pathTab: $("pathTab"), playTab: $("playTab"), buildTab: $("buildTab"),
+    fsmLab: $("fsmLab"), matrixLab: $("matrixLab"), pathLab: $("pathLab"), playLab: $("playLab"), buildLab: $("buildLab"),
+    buildGrid: $("buildGrid"), buildSize: $("buildSize"), buildSizeValue: $("buildSizeValue"), buildStatus: $("buildStatus"),
+    buildTools: $("buildTools"), playBuildBtn: $("playBuildBtn"), clearBuildBtn: $("clearBuildBtn"), playgroundMapOption: $("playgroundMapOption"),
     distanceLine: $("distanceLine"), distanceSlider: $("distanceSlider"), distanceValue: $("distanceValue"), currentState: $("currentState"), stateReason: $("stateReason"),
     matrixGrid: $("matrixGrid"), matrixStatus: $("matrixStatus"), matrixSize: $("matrixSize"), matrixFloor: $("matrixFloor"), matrixWalls: $("matrixWalls"),
     matrixPacmanPos: $("matrixPacmanPos"), matrixGhostPos: $("matrixGhostPos"), matrixGhost2Pos: $("matrixGhost2Pos"), matrixDistance: $("matrixDistance"), runMatrixLabBtn: $("runMatrixLabBtn"),
@@ -37,7 +39,7 @@
   let toastTimer = null;
 
   function emptyProfile() {
-    return { current: 0, completed: [], skipped: [], attempts: {}, hints: {}, drafts: {}, studentMapCode: "", gameMapIndex: 0 };
+    return { current: 0, completed: [], skipped: [], attempts: {}, hints: {}, drafts: {}, studentMapCode: "", gameMapIndex: 0, playground: null, playgroundPlayed: false };
   }
 
   function loadStore() {
@@ -95,7 +97,9 @@
     COURSE_MISSIONS.forEach((item, index) => {
       const complete = p.completed.includes(item.id);
       const skipped = (p.skipped || []).includes(item.id);
-      const unlocked = index === 0 || p.completed.includes(COURSE_MISSIONS[index - 1].id) || complete;
+      // Missions 1–6 are freely accessible (session 2 starts at 6); from mission 7 on,
+      // each mission unlocks only after the previous one is completed.
+      const unlocked = index <= 5 || complete || p.completed.includes(COURSE_MISSIONS[index - 1].id);
       const button = document.createElement("button");
       button.className = `nav-mission${index === currentIndex ? " active" : ""}${complete ? " complete" : ""}${skipped ? " skipped" : ""}`;
       if (index === currentIndex) button.setAttribute("aria-current", "step");
@@ -137,7 +141,7 @@
     const skipped = (p.skipped || []).includes(item.id);
     els.nextBtn.disabled = !done;
     els.nextBtn.textContent = currentIndex === TOTAL - 1 ? "View result →" : "Next mission →";
-    els.checkBtn.textContent = task.validator === "matrixMap" ? "Run map" : "Check answer";
+    els.checkBtn.textContent = task.validator === "matrixMap" ? "Run map" : task.type === "build" ? "Check level" : "Check answer";
     els.runMatrixLabBtn.hidden = task.validator !== "matrixMap";
     renderAnswer(task, p.drafts[item.id]);
     if (item.lab === "matrix") {
@@ -145,8 +149,9 @@
       const savedMatrix = parseMatrixCode(matrixDraft || "");
       if (savedMatrix.ok) renderStudentMatrix(savedMatrix);
     }
-    const labOrder = ["play", "fsm", "fsm", "matrix", "matrix", "path", "play", "path", "play", "play", "play"];
-    openLab(labOrder[currentIndex]);
+    const labOrder = ["play", "fsm", "fsm", "matrix", "matrix", "path", "path", "path", "play", "play", "play", "build"];
+    openLab(labOrder[currentIndex] || "play");
+    if (item.id === "cost" && pathState.mapIndex !== 1) loadMap(1);
     if (done) setFeedback(skipped ? "hint" : "success", skipped ? "This mission was skipped. You may continue, or submit a correct answer later to replace SKIP with a completed check." : "Completed. You may review the task or continue to the next mission.");
   }
 
@@ -248,6 +253,35 @@
     if (task.type === "triple") renderTriple(task, draft);
     if (task.type === "order") renderOrder(task, draft);
     if (task.type === "code") renderCode(task, draft);
+    if (task.type === "build") renderBuildTask();
+  }
+
+  let buildChecklistEl = null;
+
+  function renderBuildTask() {
+    const wrap = document.createElement("div");
+    wrap.className = "build-task";
+    buildChecklistEl = document.createElement("ul");
+    buildChecklistEl.className = "build-checklist";
+    const openBtn = document.createElement("button");
+    openBtn.className = "button ghost";
+    openBtn.textContent = "Open Build lab →";
+    openBtn.addEventListener("click", () => openLab("build"));
+    wrap.append(buildChecklistEl, openBtn);
+    els.answerArea.append(wrap);
+    updateBuildChecklist();
+  }
+
+  function updateBuildChecklist() {
+    if (!buildChecklistEl || !buildChecklistEl.isConnected) return;
+    const status = playgroundStatus();
+    buildChecklistEl.replaceChildren();
+    status.checks.forEach(([done, label]) => {
+      const item = document.createElement("li");
+      item.className = done ? "done" : "";
+      item.textContent = `${done ? "✓" : "○"} ${label}`;
+      buildChecklistEl.append(item);
+    });
   }
 
   function renderChoice(task, draft) {
@@ -576,13 +610,15 @@
       resetGame(false);
     }
     els.nextBtn.disabled = false;
+    if (task.type === "build") updateBuildChecklist();
     setFeedback("success", matrixResult ? `Playable Student map saved. P ${matrixResult.pacmanPos.join(",")}; G1 ${matrixResult.ghostPositions[0].join(",")}; G2 ${matrixResult.ghostPositions[1].join(",")}. Open Play Lab and choose Student map.` : (task.success || "Correct. The logic matches the lecture and the mission is complete."));
     renderProgress();
     renderNav();
     renderGameHUD();
     game.ghosts.forEach((ghost) => { ghost.cachedPath = []; ghost.lastDecision = ""; });
     if (newlyCompleted || wasSkipped) showToast(wasSkipped ? "Skipped mission replaced with a correct answer" : matrixResult ? "Student matrix map built" : `Game AI upgraded: ${item.nav}`);
-    if (currentIndex === TOTAL - 1) {
+    // Mission 11 (integration) completes the smart-monster build; mission 12 is a bonus.
+    if (item.id === "integration") {
       resetGame(false);
       openLab("play");
       setGameOverlay("STUDENT AI READY", "Validated FSM + Dijkstra logic is live", "PLAY", true);
@@ -593,6 +629,7 @@
   function validate(task, answer) {
     if (task.type === "choice") return answer === task.answer;
     if (task.type === "triple" || task.type === "order") return JSON.stringify(answer) === JSON.stringify(task.answer);
+    if (task.type === "build") return playgroundStatus().ok;
     return validateCode(task.validator, answer);
   }
 
@@ -768,18 +805,18 @@
   function analyzeTileCostFunction(code) {
     const c = compact(code);
     const header = c.match(/defget_tile_cost\(([a-z_]\w*)\):/);
-    if (!header) return { ok: false, hasHeader: false, wallCase: false, nearWallCase: false, defaultCase: false };
+    if (!header) return { ok: false, hasHeader: false, wallCase: false, slimeCase: false, defaultCase: false };
     const escaped = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const tile = escaped(header[1]);
     const wallCondition = c.search(new RegExp(`${tile}==wall`));
     const wallReturn = wallCondition >= 0 ? c.indexOf("returnnone", wallCondition) : -1;
-    const nearWallCondition = wallReturn >= 0 ? c.search(new RegExp(`${tile}==near_wall`)) : -1;
-    const nearWallReturn = nearWallCondition > wallReturn ? c.indexOf("return2", nearWallCondition) : -1;
-    const defaultReturn = nearWallReturn >= 0 ? c.indexOf("return1", nearWallReturn) : -1;
-    const wallCase = wallCondition >= 0 && wallReturn > wallCondition && (nearWallCondition < 0 || wallReturn < nearWallCondition);
-    const nearWallCase = nearWallCondition > wallReturn && nearWallReturn > nearWallCondition;
-    const defaultCase = defaultReturn > nearWallReturn;
-    return { ok: wallCase && nearWallCase && defaultCase, hasHeader: true, wallCase, nearWallCase, defaultCase };
+    const slimeCondition = wallReturn >= 0 ? c.search(new RegExp(`${tile}==slime`)) : -1;
+    const slimeReturn = slimeCondition > wallReturn ? c.indexOf("return2", slimeCondition) : -1;
+    const defaultReturn = slimeReturn >= 0 ? c.indexOf("return1", slimeReturn) : -1;
+    const wallCase = wallCondition >= 0 && wallReturn > wallCondition && (slimeCondition < 0 || wallReturn < slimeCondition);
+    const slimeCase = slimeCondition > wallReturn && slimeReturn > slimeCondition;
+    const defaultCase = defaultReturn > slimeReturn;
+    return { ok: wallCase && slimeCase && defaultCase, hasHeader: true, wallCase, slimeCase, defaultCase };
   }
 
   function validateCode(kind, code) {
@@ -925,7 +962,7 @@
       const analysis = analyzeTileCostFunction(code);
       need(analysis.hasHeader, "Define `get_tile_cost()` with one tile parameter.");
       need(analysis.wallCase, "Connect the WALL condition directly to `return None`, before numeric costs.");
-      need(analysis.nearWallCase, "Connect the NEAR_WALL condition directly to `return 2`, after the WALL case.");
+      need(analysis.slimeCase, "Connect the SLIME condition directly to `return 2`, after the WALL case.");
       need(analysis.defaultCase, "Finish with `return 1` for every remaining floor tile.");
     }
     if (kind === "relaxation") {
@@ -959,6 +996,11 @@
   }
 
   function feedbackFor(task, answer) {
+    if (task.type === "build") {
+      updateBuildChecklist();
+      const status = playgroundStatus();
+      return "Finish these steps in the Build lab:\n• " + status.issues.join("\n• ");
+    }
     if (task.type === "choice") return "Selected choice: " + (answer || "none") + "\nCheck the Key idea and compare it with the live lab.";
     if (task.type === "triple") {
       const wrong = task.labels.filter((label, index) => answer[index] !== task.answer[index]);
@@ -1043,7 +1085,7 @@
 
   function showCompletion() {
     const totalHints = Object.values(profile().hints).reduce((sum, value) => sum + Number(value || 0), 0);
-    els.resultMissions.textContent = `${TOTAL} / ${TOTAL}`;
+    els.resultMissions.textContent = `${Math.min(profile().completed.length, TOTAL)} / ${TOTAL}`;
     els.resultSkipped.textContent = String((profile().skipped || []).length);
     els.resultHints.textContent = totalHints;
     if (!els.completeDialog.open) els.completeDialog.showModal();
@@ -1141,8 +1183,8 @@
   }
 
   function openLab(name) {
-    const fsm = name === "fsm", matrix = name === "matrix", path = name === "path", play = name === "play";
-    [[els.fsmTab, els.fsmLab, fsm], [els.matrixTab, els.matrixLab, matrix], [els.pathTab, els.pathLab, path], [els.playTab, els.playLab, play]].forEach(([tab, panel, active]) => {
+    const fsm = name === "fsm", matrix = name === "matrix", path = name === "path", play = name === "play", build = name === "build";
+    [[els.fsmTab, els.fsmLab, fsm], [els.matrixTab, els.matrixLab, matrix], [els.pathTab, els.pathLab, path], [els.playTab, els.playLab, play], [els.buildTab, els.buildLab, build]].forEach(([tab, panel, active]) => {
       tab.classList.toggle("active", active);
       tab.setAttribute("aria-selected", String(active));
       tab.tabIndex = active ? 0 : -1;
@@ -1150,12 +1192,13 @@
       panel.hidden = !active;
     });
     if (play) { drawGame(); renderGameHUD(); }
+    if (build) renderBuilderStatus();
   }
 
   function moveLabFocus(event) {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
-    const tabs = [els.fsmTab, els.matrixTab, els.pathTab, els.playTab];
+    const tabs = [els.fsmTab, els.matrixTab, els.pathTab, els.playTab, els.buildTab];
     const current = tabs.indexOf(document.activeElement);
     let next = current;
     if (event.key === 'Home') next = 0;
@@ -1387,17 +1430,262 @@
     renderPath();
   }
 
+  // Level designer (Build lab): students paint a playable board with walls, slime, and character starts.
+  const builder = { size: 12, grid: [], pacman: null, ghosts: [null, null], tool: "wall", painting: false, cells: [] };
+
+  function defaultBuilderGrid(size) {
+    return Array.from({ length: size }, () => Array(size).fill(0));
+  }
+
+  function initBuilder() {
+    const saved = profile().playground;
+    const validGrid = saved?.grid?.length >= 8 && saved.grid.length <= 25 && saved.grid.every((row) => Array.isArray(row) && row.length === saved.grid.length);
+    if (validGrid) {
+      builder.size = saved.grid.length;
+      builder.grid = saved.grid.map((row) => row.map((value) => value === 1 || value === 2 || value === 3 ? value : 0));
+      const inside = (pos) => Array.isArray(pos) && pos[0] >= 0 && pos[0] < builder.size && pos[1] >= 0 && pos[1] < builder.size ? [pos[0], pos[1]] : null;
+      builder.pacman = inside(saved.pacman);
+      builder.ghosts = [0, 1].map((index) => inside(saved.ghosts?.[index]));
+    } else {
+      builder.size = 12;
+      builder.grid = defaultBuilderGrid(12);
+      builder.pacman = null;
+      builder.ghosts = [null, null];
+    }
+    els.buildSize.value = String(builder.size);
+    renderBuilder();
+  }
+
+  function saveBuilder() {
+    profile().playground = { size: builder.size, grid: builder.grid, pacman: builder.pacman, ghosts: builder.ghosts };
+    saveStore();
+  }
+
+  function resizeBuilder(size) {
+    const next = defaultBuilderGrid(size);
+    const keep = Math.min(size, builder.size);
+    for (let r = 0; r < keep; r += 1) for (let c = 0; c < keep; c += 1) next[r][c] = builder.grid[r][c];
+    builder.size = size;
+    builder.grid = next;
+    const inside = (pos) => pos && pos[0] < size && pos[1] < size ? pos : null;
+    builder.pacman = inside(builder.pacman);
+    builder.ghosts = builder.ghosts.map(inside);
+    saveBuilder();
+    renderBuilder();
+    updateBuildChecklist();
+    syncPlaygroundOption(false);
+  }
+
+  function builderMarkerAt(row, col) {
+    if (builder.pacman && builder.pacman[0] === row && builder.pacman[1] === col) return "P";
+    if (builder.ghosts[0] && builder.ghosts[0][0] === row && builder.ghosts[0][1] === col) return "G1";
+    if (builder.ghosts[1] && builder.ghosts[1][0] === row && builder.ghosts[1][1] === col) return "G2";
+    return null;
+  }
+
+  function updateBuilderCell(row, col) {
+    const cell = builder.cells[row]?.[col];
+    if (!cell) return;
+    const value = builder.grid[row][col];
+    cell.className = `matrix-cell build-cell ${value === 1 ? "wall" : value === 2 ? "slime" : value === 3 ? "coin" : "floor"}`;
+    cell.replaceChildren();
+    const marker = builderMarkerAt(row, col);
+    const tileName = value === 1 ? "wall" : value === 2 ? "slime (ghosts cross at half speed)" : value === 3 ? "coin (bonus, 50 points)" : "pellet path";
+    cell.title = marker ? `row ${row}, column ${col}: ${marker === "P" ? "Pac-Man start" : marker + " start"}` : `row ${row}, column ${col}: ${tileName}`;
+    if (marker) {
+      cell.classList.add(marker === "P" ? "runner" : "ghost");
+      const image = document.createElement("img");
+      image.src = marker === "P" ? "assets/maze-runner-open.svg" : marker === "G1" ? "assets/ghost-coral.svg" : "assets/ghost-blue.svg";
+      image.alt = "";
+      image.draggable = false;
+      cell.append(image);
+    }
+  }
+
+  function renderBuilder() {
+    els.buildGrid.replaceChildren();
+    els.buildGrid.style.gridTemplateColumns = `repeat(${builder.size}, minmax(0, 1fr))`;
+    builder.cells = [];
+    for (let r = 0; r < builder.size; r += 1) {
+      builder.cells.push([]);
+      for (let c = 0; c < builder.size; c += 1) {
+        const cell = document.createElement("div");
+        cell.dataset.row = String(r);
+        cell.dataset.col = String(c);
+        builder.cells[r].push(cell);
+        els.buildGrid.append(cell);
+        updateBuilderCell(r, c);
+      }
+    }
+    els.buildSizeValue.textContent = `${builder.size} × ${builder.size}`;
+    renderBuilderStatus();
+  }
+
+  function applyBuilderTool(row, col) {
+    const refresh = [[row, col]];
+    if (builder.tool === "wall" || builder.tool === "floor" || builder.tool === "slime" || builder.tool === "coin") {
+      builder.grid[row][col] = builder.tool === "wall" ? 1 : builder.tool === "slime" ? 2 : builder.tool === "coin" ? 3 : 0;
+      if (builder.tool === "wall") {
+        if (builderMarkerAt(row, col) === "P") builder.pacman = null;
+        builder.ghosts = builder.ghosts.map((pos) => pos && pos[0] === row && pos[1] === col ? null : pos);
+      }
+    } else {
+      if (builder.grid[row][col] === 1) builder.grid[row][col] = 0;
+      const previous = builder.tool === "pacman" ? builder.pacman : builder.ghosts[builder.tool === "g1" ? 0 : 1];
+      if (previous) refresh.push(previous);
+      // A tile holds one character: placing over another marker moves that marker away.
+      if (builder.tool !== "pacman" && builderMarkerAt(row, col) === "P") builder.pacman = null;
+      builder.ghosts = builder.ghosts.map((pos, index) => {
+        const isTarget = (builder.tool === "g1" && index === 0) || (builder.tool === "g2" && index === 1);
+        return !isTarget && pos && pos[0] === row && pos[1] === col ? null : pos;
+      });
+      if (builder.tool === "pacman") builder.pacman = [row, col];
+      if (builder.tool === "g1") builder.ghosts[0] = [row, col];
+      if (builder.tool === "g2") builder.ghosts[1] = [row, col];
+    }
+    refresh.forEach(([r, c]) => updateBuilderCell(r, c));
+    renderBuilderStatus();
+  }
+
+  function builderCounts() {
+    let walls = 0, slime = 0, coins = 0;
+    builder.grid.forEach((row) => row.forEach((value) => {
+      if (value === 1) walls += 1;
+      if (value === 2) slime += 1;
+      if (value === 3) coins += 1;
+    }));
+    return { walls, slime, coins };
+  }
+
+  function builderReachable() {
+    if (!builder.pacman) return new Set();
+    const reachable = new Set([builder.pacman.join(",")]);
+    const queue = [builder.pacman];
+    while (queue.length) {
+      const [row, col] = queue.shift();
+      [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => {
+        const nr = row + dr, nc = col + dc, key = `${nr},${nc}`;
+        if (nr < 0 || nr >= builder.size || nc < 0 || nc >= builder.size || builder.grid[nr][nc] === 1 || reachable.has(key)) return;
+        reachable.add(key);
+        queue.push([nr, nc]);
+      });
+    }
+    return reachable;
+  }
+
+  function playgroundStatus() {
+    const { walls, slime } = builderCounts();
+    const checks = [];
+    const issues = [];
+    const check = (ok, doneLabel, issueLabel) => {
+      checks.push([ok, doneLabel]);
+      if (!ok) issues.push(issueLabel);
+    };
+    check(walls >= 12, `Paint at least 12 wall tiles (${Math.min(walls, 12)}/12)`, `Paint at least 12 wall tiles. Current: ${walls}.`);
+    check(slime >= 3, `Paint at least 3 slime tiles (${Math.min(slime, 3)}/3)`, `Paint at least 3 slime tiles. Current: ${slime}.`);
+    check(Boolean(builder.pacman), "Place Pac-Man (P)", "Place Pac-Man with the P tool.");
+    check(Boolean(builder.ghosts[0]), "Place Ghost 1 (G1)", "Place Ghost 1 with the G1 tool.");
+    check(Boolean(builder.ghosts[1]), "Place Ghost 2 (G2)", "Place Ghost 2 with the G2 tool.");
+    if (builder.pacman) {
+      const reachable = builderReachable();
+      builder.ghosts.forEach((pos, index) => {
+        if (!pos) return;
+        const connected = reachable.has(pos.join(","));
+        const distance = Math.abs(pos[0] - builder.pacman[0]) + Math.abs(pos[1] - builder.pacman[1]);
+        check(connected, `Ghost ${index + 1} can reach Pac-Man`, `Ghost ${index + 1} is sealed off — connect its corridor to Pac-Man.`);
+        check(distance >= 6, `Ghost ${index + 1} starts ≥ 6 tiles away`, `Move Ghost ${index + 1} at least 6 tiles from Pac-Man. Current distance: ${distance}.`);
+      });
+    }
+    check(Boolean(profile().playgroundPlayed), "Play your map once", "Press Play this map, then START GAME.");
+    return { ok: !issues.length, checks, issues };
+  }
+
+  function renderBuilderStatus(message) {
+    if (message) {
+      els.buildStatus.textContent = message;
+      return;
+    }
+    const { walls, slime, coins } = builderCounts();
+    const markers = [builder.pacman ? "P ✓" : "P —", builder.ghosts[0] ? "G1 ✓" : "G1 —", builder.ghosts[1] ? "G2 ✓" : "G2 —"].join(" · ");
+    els.buildStatus.textContent = `${builder.size} × ${builder.size} board · ${walls} walls · ${slime} slime · ${coins} coins · ${markers}. An automatic border wall and pellets are added at play time.`;
+  }
+
+  function playgroundGameRows() {
+    if (!builder.grid.length || !builder.pacman || !builder.ghosts[0] || !builder.ghosts[1]) return null;
+    const border = "#".repeat(builder.size + 2);
+    const rows = builder.grid.map((row, r) => `#${row.map((value, c) => {
+      const marker = builderMarkerAt(r, c);
+      if (marker === "P") return "P";
+      if (marker === "G1") return "A";
+      if (marker === "G2") return "B";
+      return value === 1 ? "#" : value === 2 ? "~" : value === 3 ? "o" : ".";
+    }).join("")}#`);
+    return [border, ...rows, border];
+  }
+
+  function syncPlaygroundOption(selectPlayground = false) {
+    const rows = playgroundGameRows();
+    els.playgroundMapOption.disabled = !rows;
+    els.playgroundMapOption.textContent = rows ? `Playground · ${builder.size} × ${builder.size}` : "Playground · design first";
+    if (rows && selectPlayground) {
+      game.mapIndex = 3;
+      profile().gameMapIndex = 3;
+      els.gameMapSelect.value = "3";
+    } else if (!rows && game.mapIndex === 3) {
+      game.mapIndex = 0;
+      profile().gameMapIndex = 0;
+      els.gameMapSelect.value = "0";
+    }
+    return rows;
+  }
+
+  function playBuilderMap() {
+    saveBuilder();
+    if (!builder.pacman || !builder.ghosts[0] || !builder.ghosts[1]) {
+      renderBuilderStatus("Place P, G1, and G2 before playing your level.");
+      return;
+    }
+    // A level where a ghost and Pac-Man can never meet is unplayable — refuse to start it.
+    const reachable = builderReachable();
+    const sealed = builder.ghosts
+      .map((pos, index) => pos && !reachable.has(pos.join(",")) ? `G${index + 1}` : null)
+      .filter(Boolean);
+    if (sealed.length) {
+      renderBuilderStatus(`${sealed.join(" and ")} cannot reach Pac-Man — open a corridor between them before playing.`);
+      return;
+    }
+    const rows = syncPlaygroundOption(true);
+    if (!rows) {
+      renderBuilderStatus("Place P, G1, and G2 before playing your level.");
+      return;
+    }
+    saveStore();
+    resetGame(false);
+    openLab("play");
+    setGameOverlay("YOUR LEVEL", "Press START GAME to play the maze you designed", "START GAME", true);
+    showToast("Playground map loaded");
+    updateBuildChecklist();
+  }
+
+  function builderCellFromEvent(event) {
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    const cell = target?.closest?.(".build-cell");
+    if (!cell) return null;
+    return [Number(cell.dataset.row), Number(cell.dataset.col)];
+  }
+
   // Playable Pac-Man lab. Completed coding missions progressively upgrade the ghost AI.
+  // "~" is sticky slime: still walkable and holds a pellet, but ghosts cross it at half speed (cost 2).
   const GAME_MAPS = [
     [
       "#################", "#P....#.........#", "#.###.#.#####.#.#", "#.....#...#...#.#", "###.#####.#.###.#",
-      "#...#.....#.....#", "#.#.#.###.#####.#", "#.#.....#.......#", "#.#####.#.#####.#", "#.......#.....#.#",
-      "#.###.#####.#.#.#", "#...#.......#...#", "#.#.###.#.###.#.#", "#G......#......G#", "#################"
+      "#...#..~~.#.....#", "#.#.#.###.#####.#", "#.#.....#.......#", "#.#####.#.#####.#", "#...~~..#.....#.#",
+      "#.###.#####.#.#.#", "#...#..~~...#...#", "#.#.###.#.###.#.#", "#G......#......G#", "#################"
     ],
     [
       "#################", "#P......#.......#", "#.#####.#.#####.#", "#.....#.#.#.....#", "#####.#.#.#.#####",
-      "#.....#...#.....#", "#.###.#####.###.#", "#...#...#...#...#", "###.###.#.###.###", "#.....#...#.....#",
-      "#.###.#####.###.#", "#.#.....#.....#.#", "#.#.###.#.###.#.#", "#G....#...#....G#", "#################"
+      "#..~~.#...#.....#", "#.###.#####.###.#", "#...#...#...#...#", "###.###.#.###.###", "#.....#...#.~~..#",
+      "#.###.#####.###.#", "#.#..~~.#.....#.#", "#.#.###.#.###.#.#", "#G....#...#....G#", "#################"
     ]
   ];
 
@@ -1432,7 +1720,7 @@
 
   const DIRS = { UP: { x: 0, y: -1 }, DOWN: { x: 0, y: 1 }, LEFT: { x: -1, y: 0 }, RIGHT: { x: 1, y: 0 }, NONE: { x: 0, y: 0 } };
   const game = {
-    mapIndex: 0, map: [], playerStart: null, ghostStarts: [], player: null, ghosts: [], pellets: new Set(), score: 0, lives: 3,
+    mapIndex: 0, map: [], playerStart: null, ghostStarts: [], player: null, ghosts: [], pellets: new Set(), coins: new Set(), score: 0, lives: 3,
     running: false, paused: false, sound: true, lastTime: 0, tick: 0, audio: null, lastStateSound: 0, message: "READY?"
   };
   const gameCtx = els.gameCanvas.getContext("2d");
@@ -1454,8 +1742,9 @@
   }
 
   function fullStudentAIReady() {
+    // Mission 12 (playground) is a bonus level-design activity and not part of the AI build.
     const complete = completedSet();
-    return COURSE_MISSIONS.every((item) => complete.has(item.id));
+    return COURSE_MISSIONS.every((item) => item.id === "playground" || complete.has(item.id));
   }
 
   function findGameMarkers() {
@@ -1480,17 +1769,39 @@
 
   function resetGame(keepScore = false) {
     const studentMap = game.mapIndex === 2 ? studentGameMapData() : null;
-    if (game.mapIndex === 2 && !studentMap) {
+    const playgroundRows = game.mapIndex === 3 ? playgroundGameRows() : null;
+    if ((game.mapIndex === 2 && !studentMap) || (game.mapIndex === 3 && !playgroundRows)) {
       game.mapIndex = 0;
       els.gameMapSelect.value = "0";
     }
-    const selectedRows = studentMap?.rows || GAME_MAPS[game.mapIndex] || GAME_MAPS[0];
+    const selectedRows = studentMap?.rows || playgroundRows || GAME_MAPS[game.mapIndex] || GAME_MAPS[0];
     game.map = selectedRows.map((row) => row.split(""));
     findGameMarkers();
     game.player = makeEntity(game.playerStart, "player");
     game.ghosts = game.ghostStarts.map((start, index) => makeEntity(start, "ghost", index));
     game.pellets = new Set();
-    game.map.forEach((row, r) => row.forEach((char, c) => { if (char === ".") game.pellets.add(`${r},${c}`); }));
+    game.coins = new Set();
+    game.map.forEach((row, r) => row.forEach((char, c) => {
+      if (char === "." || char === "~") game.pellets.add(`${r},${c}`);
+      if (char === "o") game.coins.add(`${r},${c}`);
+    }));
+    // Pellets and coins spawn only where Pac-Man can actually reach, so a sealed-off
+    // pocket can never make the maze impossible to clear.
+    if (game.playerStart) {
+      const reachable = new Set([`${game.playerStart[0]},${game.playerStart[1]}`]);
+      const queue = [game.playerStart];
+      while (queue.length) {
+        const [row, col] = queue.shift();
+        [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => {
+          const nr = row + dr, nc = col + dc, key = `${nr},${nc}`;
+          if (isGameWall(nr, nc) || reachable.has(key)) return;
+          reachable.add(key);
+          queue.push([nr, nc]);
+        });
+      }
+      game.pellets = new Set([...game.pellets].filter((key) => reachable.has(key)));
+      game.coins = new Set([...game.coins].filter((key) => reachable.has(key)));
+    }
     if (!keepScore) { game.score = 0; game.lives = 3; }
     game.running = false;
     game.paused = false;
@@ -1518,6 +1829,11 @@
 
   function startGame() {
     if (game.lives <= 0 || game.pellets.size === 0) resetGame(false);
+    if (game.mapIndex === 3 && !profile().playgroundPlayed) {
+      profile().playgroundPlayed = true;
+      saveStore();
+      updateBuildChecklist();
+    }
     game.running = true;
     game.paused = false;
     game.lastTime = performance.now();
@@ -1575,10 +1891,20 @@
   function collectPellet() {
     const row = Math.floor(game.player.y), col = Math.floor(game.player.x), key = `${row},${col}`;
     const centered = Math.abs(game.player.x - (col + .5)) < .28 && Math.abs(game.player.y - (row + .5)) < .28;
-    if (!centered || !game.pellets.delete(key)) return;
-    game.score += 10;
-    playCue(game.score % 20 ? "pelletLow" : "pelletHigh");
-    if (game.pellets.size === 0) {
+    if (!centered) return;
+    let collected = false;
+    if (game.pellets.delete(key)) {
+      game.score += 10;
+      playCue(game.score % 20 ? "pelletLow" : "pelletHigh");
+      collected = true;
+    }
+    if (game.coins.delete(key)) {
+      game.score += 50;
+      playCue("coin");
+      collected = true;
+    }
+    if (!collected) return;
+    if (game.pellets.size === 0 && game.coins.size === 0) {
       game.running = false;
       setGameOverlay("MAZE CLEARED", `Score ${game.score} · Smart AI survived`, "PLAY AGAIN", true);
       playCue("clear");
@@ -1699,15 +2025,20 @@
     }
     const complete = completedSet();
     const base = ghost.state === "ATTACK" ? 2.55 : ghost.state === "CHASE" ? 2.25 : 1.8;
-    const speed = base + (complete.has("integration") ? .22 : 0);
+    // Sticky slime always halves ghost speed (cost 2 = two ticks per tile); Pac-Man hops across freely.
+    const terrain = isGameSlime(Math.floor(ghost.y), Math.floor(ghost.x)) ? .5 : 1;
+    const speed = (base + (complete.has("integration") ? .22 : 0)) * terrain;
     ghost.x += ghost.dir.x * speed * dt;
     ghost.y += ghost.dir.y * speed * dt;
   }
 
+  function isGameSlime(row, col) {
+    return game.map[row]?.[col] === "~";
+  }
+
   function gameTileCost(row, col, weighted) {
     if (!weighted) return 1;
-    const nearWall = [[-1,0],[1,0],[0,-1],[0,1]].some(([dr,dc]) => isGameWall(row + dr, col + dc));
-    return nearWall ? 2 : 1;
+    return isGameSlime(row, col) ? 2 : 1;
   }
 
   function findGamePath(start, goal, weighted, tieOffset = 0) {
@@ -1775,6 +2106,20 @@
         gameCtx.beginPath();
         gameCtx.roundRect(c * cellW + pad, r * cellH + pad, cellW - pad * 2, cellH - pad * 2, 5);
         gameCtx.fill(); gameCtx.stroke();
+      } else if (char === "~") {
+        const pad = 1.5;
+        gameCtx.fillStyle = "rgba(53, 178, 126, .30)";
+        gameCtx.strokeStyle = "rgba(95, 244, 200, .45)";
+        gameCtx.lineWidth = 1.2;
+        gameCtx.beginPath();
+        gameCtx.roundRect(c * cellW + pad, r * cellH + pad, cellW - pad * 2, cellH - pad * 2, 7);
+        gameCtx.fill(); gameCtx.stroke();
+        gameCtx.fillStyle = "rgba(95, 244, 200, .5)";
+        [[.28, .32, .10], [.68, .62, .08], [.45, .78, .06]].forEach(([bx, by, br]) => {
+          gameCtx.beginPath();
+          gameCtx.arc((c + bx) * cellW, (r + by) * cellH, Math.max(1.5, cellW * br), 0, Math.PI * 2);
+          gameCtx.fill();
+        });
       }
     }));
 
@@ -1782,6 +2127,18 @@
       const [r,c] = key.split(",").map(Number);
       gameCtx.fillStyle = "#d7ede8";
       gameCtx.beginPath(); gameCtx.arc((c + .5) * cellW, (r + .5) * cellH, Math.max(2, cellW * .07), 0, Math.PI * 2); gameCtx.fill();
+    });
+
+    game.coins.forEach((key) => {
+      const [r,c] = key.split(",").map(Number);
+      const pulse = 1 + Math.sin(performance.now() / 260 + r + c) * .12;
+      const radius = Math.max(4, cellW * .17) * pulse;
+      gameCtx.fillStyle = "#ffd34d";
+      gameCtx.strokeStyle = "#b98d00";
+      gameCtx.lineWidth = 1.5;
+      gameCtx.beginPath(); gameCtx.arc((c + .5) * cellW, (r + .5) * cellH, radius, 0, Math.PI * 2); gameCtx.fill(); gameCtx.stroke();
+      gameCtx.fillStyle = "rgba(255, 255, 255, .55)";
+      gameCtx.beginPath(); gameCtx.arc((c + .42) * cellW, (r + .42) * cellH, radius * .3, 0, Math.PI * 2); gameCtx.fill();
     });
 
     let chasePathLines = 0;
@@ -1859,7 +2216,7 @@
       const cost = ghost.pathCost === null ? "" : ` · cost ${ghost.pathCost}`;
       return `<div class="ghost-reading" data-state="${ghost.state}" data-row="${Math.floor(ghost.y)}" data-col="${Math.floor(ghost.x)}"><img src="assets/${index === 0 ? "ghost-coral" : "ghost-blue"}.svg" alt=""><div class="ghost-reading-copy"><span>GHOST ${index + 1} · tile ${tile} · ${distance}</span><strong>${ghost.state}</strong><small>${ghost.action}${cost}</small></div></div>`;
     }).join("");
-    const features = [["problem","BEHAVIORS"],["fsm","FSM STATES"],["conditions","RANGE RULES"],["matrix","MATRIX MAP"],["distance","GRID DISTANCE"],["grid","NEIGHBORS"],["cost","WEIGHTED COST"],["dijkstra","DIJKSTRA"],["path-api","PATH[1] MOVE"],["recalculate","RECALCULATE"],["integration","FULL AI"]];
+    const features = [["problem","BEHAVIORS"],["fsm","FSM STATES"],["conditions","RANGE RULES"],["matrix","MATRIX MAP"],["distance","GRID DISTANCE"],["grid","NEIGHBORS"],["cost","SLIME COST"],["dijkstra","DIJKSTRA"],["path-api","PATH[1] MOVE"],["recalculate","RECALCULATE"],["integration","FULL AI"],["playground","CUSTOM MAP"]];
     els.aiFeatureList.innerHTML = features.map(([id,label]) => `<span class="ai-feature${complete.has(id) ? " on" : ""}">${complete.has(id) ? "✓ " : "○ "}${label}</span>`).join("");
     els.runtimeStatus.dataset.ready = String(ready);
     els.runtimeStatus.querySelector("span").textContent = ready ? "STUDENT AI LIVE" : "VALIDATED LOGIC";
@@ -1896,6 +2253,7 @@
     start: [[0, 330, .055, "square", .024], [65, 440, .055, "square", .025], [130, 660, .09, "triangle", .03]],
     pelletLow: [[0, 620, .028, "square", .014]],
     pelletHigh: [[0, 790, .028, "square", .014]],
+    coin: [[0, 660, .05, "triangle", .03], [60, 880, .07, "triangle", .032], [130, 1320, .1, "triangle", .03]],
     pause: [[0, 430, .05, "triangle", .02], [70, 300, .08, "triangle", .018]],
     resume: [[0, 300, .05, "triangle", .018], [70, 480, .08, "triangle", .022]],
     patrol: [[0, 260, .07, "sine", .016]],
@@ -1940,8 +2298,10 @@
     store.profile = emptyProfile();
     currentIndex = 0;
     saveStore();
+    initBuilder();
     renderAll();
     syncStudentMapOption(false);
+    syncPlaygroundOption(false);
     resetGame(false);
     showToast("Course progress reset");
   });
@@ -1949,7 +2309,46 @@
   els.matrixTab.addEventListener("click", () => openLab("matrix"));
   els.pathTab.addEventListener("click", () => openLab("path"));
   els.playTab.addEventListener("click", () => openLab("play"));
-  [els.fsmTab, els.matrixTab, els.pathTab, els.playTab].forEach((tab) => tab.addEventListener("keydown", moveLabFocus));
+  els.buildTab.addEventListener("click", () => openLab("build"));
+  [els.fsmTab, els.matrixTab, els.pathTab, els.playTab, els.buildTab].forEach((tab) => tab.addEventListener("keydown", moveLabFocus));
+  els.buildGrid.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    builder.painting = true;
+    try { els.buildGrid.setPointerCapture(event.pointerId); } catch (_) { /* capture is a nicety */ }
+    const pos = builderCellFromEvent(event);
+    if (pos) applyBuilderTool(pos[0], pos[1]);
+  });
+  els.buildGrid.addEventListener("pointermove", (event) => {
+    if (!builder.painting) return;
+    const pos = builderCellFromEvent(event);
+    if (pos) applyBuilderTool(pos[0], pos[1]);
+  });
+  window.addEventListener("pointerup", () => {
+    if (!builder.painting) return;
+    builder.painting = false;
+    saveBuilder();
+    syncPlaygroundOption(false);
+    updateBuildChecklist();
+  });
+  els.buildTools.querySelectorAll(".build-tool").forEach((button) => button.addEventListener("click", () => {
+    builder.tool = button.dataset.tool;
+    els.buildTools.querySelectorAll(".build-tool").forEach((item) => item.classList.toggle("active", item === button));
+  }));
+  els.buildSize.addEventListener("input", () => {
+    els.buildSizeValue.textContent = `${els.buildSize.value} × ${els.buildSize.value}`;
+  });
+  els.buildSize.addEventListener("change", () => resizeBuilder(Number(els.buildSize.value)));
+  els.clearBuildBtn.addEventListener("click", () => {
+    if (!window.confirm("Clear the whole playground map?")) return;
+    builder.grid = defaultBuilderGrid(builder.size);
+    builder.pacman = null;
+    builder.ghosts = [null, null];
+    saveBuilder();
+    renderBuilder();
+    syncPlaygroundOption(false);
+    updateBuildChecklist();
+  });
+  els.playBuildBtn.addEventListener("click", playBuilderMap);
   els.runMatrixLabBtn.addEventListener("click", () => {
     if (mission().task.validator !== "matrixMap") {
       setFeedback("error", "Open the Build a matrix map mission before running student matrix code.");
@@ -2002,14 +2401,28 @@
   });
   updateFSM();
   loadMap(0);
+  initBuilder();
   game.mapIndex = Number(profile().gameMapIndex) || 0;
   els.gameMapSelect.value = String(game.mapIndex);
   syncStudentMapOption(false);
+  syncPlaygroundOption(false);
   resetGame(false);
   requestAnimationFrame(gameLoop);
+  const query = new URLSearchParams(window.location.search);
+  // ?resume=6 marks missions 1..5 complete and starts at mission 6 — for resuming a
+  // multi-session class on a device without yesterday's saved progress.
+  const resume = Number(query.get("resume"));
+  if (Number.isInteger(resume) && resume >= 2 && resume <= TOTAL) {
+    const p = profile();
+    const priorIds = COURSE_MISSIONS.slice(0, resume - 1).map((item) => item.id);
+    priorIds.forEach((id) => { if (!p.completed.includes(id)) p.completed.push(id); });
+    p.skipped = (p.skipped || []).filter((id) => !priorIds.includes(id));
+    p.current = resume - 1;
+    saveStore();
+    renderGameHUD();
+  }
   currentIndex = Math.min(profile().current || 0, TOTAL - 1);
   renderAll();
-  const query = new URLSearchParams(window.location.search);
   const requestedLab = query.get("lab");
   if (["fsm", "matrix", "path", "play"].includes(requestedLab)) openLab(requestedLab);
   if (query.get("guide") === "1") {

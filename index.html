@@ -31,7 +31,7 @@
         <span><strong>Game AI Lab</strong><small>Lecture 4 · FSM &amp; Dijkstra</small></span>
       </a>
       <div class="course-progress" id="courseProgress" role="progressbar" aria-label="Course progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-        <div class="progress-copy"><span id="progressLabel">MISSION 1 / 11</span><strong id="progressPercent">0%</strong></div>
+        <div class="progress-copy"><span id="progressLabel">MISSION 1 / 12</span><strong id="progressPercent">0%</strong></div>
         <div class="progress-track"><span id="progressBar"></span></div>
       </div>
       <div class="top-actions">
@@ -107,6 +107,7 @@
           <button id="matrixTab" class="lab-tab" role="tab" aria-controls="matrixLab" aria-selected="false" tabindex="-1">Map</button>
           <button id="pathTab" class="lab-tab" role="tab" aria-controls="pathLab" aria-selected="false" tabindex="-1">Path</button>
           <button id="playTab" class="lab-tab" role="tab" aria-controls="playLab" aria-selected="false" tabindex="-1">Play</button>
+          <button id="buildTab" class="lab-tab" role="tab" aria-controls="buildLab" aria-selected="false" tabindex="-1">Build</button>
         </div>
       </div>
 
@@ -199,7 +200,7 @@ else:                    PATROL</code></pre></div>
         <div class="game-hud">
           <div><span>SCORE</span><strong id="gameScore">0</strong></div>
           <div><span>LIVES</span><strong id="gameLives">● ● ●</strong></div>
-          <div><span>LOGIC BUILT</span><strong id="aiBuild">0 / 11</strong></div>
+          <div><span>LOGIC BUILT</span><strong id="aiBuild">0 / 12</strong></div>
           <div class="game-state-main"><span>GHOST STATE</span><strong id="gameMainState">PATROL</strong></div>
         </div>
         <div class="game-controls">
@@ -207,7 +208,7 @@ else:                    PATROL</code></pre></div>
           <button class="small-button" id="gamePauseBtn">Pause</button>
           <button class="small-button" id="gameRestartBtn">Restart</button>
           <button class="small-button active" id="gameSoundBtn">Sound on</button>
-          <select id="gameMapSelect" aria-label="Game map"><option value="0">Maze A</option><option value="1">Maze B</option><option value="2" id="studentMapOption" disabled>Student map · build first</option></select>
+          <select id="gameMapSelect" aria-label="Game map"><option value="0">Maze A</option><option value="1">Maze B</option><option value="2" id="studentMapOption" disabled>Student map · build first</option><option value="3" id="playgroundMapOption" disabled>Playground · design first</option></select>
         </div>
         <div class="runtime-status" id="runtimeStatus" data-ready="false" role="status">
           <span>VALIDATED LOGIC</span>
@@ -224,7 +225,38 @@ else:                    PATROL</code></pre></div>
         </div>
         <div class="ghost-monitor" id="ghostMonitor"></div>
         <div class="ai-feature-list" id="aiFeatureList"></div>
-        <p class="game-note">The game runtime mirrors the validated Python logic: FSM chooses the state, CHASE calls Dijkstra, and <code>path[1]</code> becomes the ghost's next tile.</p>
+        <p class="game-note">The game runtime mirrors the validated Python logic: FSM chooses the state, CHASE calls Dijkstra, and <code>path[1]</code> becomes the ghost's next tile. Green slime tiles cost 2, so ghosts cross them at half speed — Pac-Man hops over them freely.</p>
+      </section>
+
+      <section id="buildLab" class="lab-view" role="tabpanel" aria-labelledby="buildTab" hidden>
+        <div class="matrix-lab-head">
+          <span class="card-label">Level designer</span>
+          <h3>Design your own maze</h3>
+          <p>Pick a tool and drag on the grid. An automatic border wall surrounds the board, every open tile gets a pellet, slime slows ghosts to half speed, and coins are 50-point bonus pickups. A level only starts when both ghosts can reach Pac-Man.</p>
+        </div>
+        <div class="build-controls">
+          <label class="build-size" for="buildSize">Size
+            <input id="buildSize" type="range" min="8" max="25" step="1" value="12" aria-label="Playground map size">
+            <strong id="buildSizeValue">12 × 12</strong>
+          </label>
+          <button class="small-button" id="clearBuildBtn">Clear</button>
+        </div>
+        <div class="build-tools" id="buildTools" role="toolbar" aria-label="Painting tools">
+          <button class="build-tool active" data-tool="wall"><i class="tool-chip chip-wall"></i>Wall</button>
+          <button class="build-tool" data-tool="floor"><i class="tool-chip chip-floor"></i>Floor</button>
+          <button class="build-tool" data-tool="slime"><i class="tool-chip chip-slime"></i>Slime</button>
+          <button class="build-tool" data-tool="coin"><i class="tool-chip chip-coin"></i>Coin</button>
+          <button class="build-tool" data-tool="pacman"><img src="assets/maze-runner-open.svg" alt="">P</button>
+          <button class="build-tool" data-tool="g1"><img src="assets/ghost-coral.svg" alt="">G1</button>
+          <button class="build-tool" data-tool="g2"><img src="assets/ghost-blue.svg" alt="">G2</button>
+        </div>
+        <div class="matrix-stage">
+          <div id="buildGrid" class="matrix-grid build-grid" aria-label="Playground level designer grid"></div>
+        </div>
+        <div id="buildStatus" class="path-status">Pick a tool and drag on the grid.</div>
+        <div class="build-actions">
+          <button class="button primary" id="playBuildBtn">Play this map</button>
+        </div>
       </section>
     </aside>
   </div>
@@ -236,7 +268,7 @@ else:                    PATROL</code></pre></div>
     <p>FSM decides <strong>when</strong> to chase. Dijkstra decides <strong>which path</strong> to take.</p>
     <div class="result-grid">
       <div><span>COURSE</span><strong>SMART MONSTER AI</strong></div>
-      <div><span>MISSIONS</span><strong id="resultMissions">11 / 11</strong></div>
+      <div><span>MISSIONS</span><strong id="resultMissions">12 / 12</strong></div>
       <div><span>SKIPPED</span><strong id="resultSkipped">0</strong></div>
       <div><span>HINTS USED</span><strong id="resultHints"></strong></div>
     </div>
