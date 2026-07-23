@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dijkstra Visual Guide</title>
+  <style>
+    :root {
+      --bg: #050713;
+      --panel: #0b1024;
+      --panel-2: #111933;
+      --line: #263765;
+      --blue: #00b7ff;
+      --blue-2: #3158ff;
+      --yellow: #ffe44d;
+      --red: #ff4b6a;
+      --green: #56f28f;
+      --cyan: #22f0ff;
+      --orange: #ffad45;
+      --text: #f4f7ff;
+      --muted: #aeb8d8;
+      --wall: #162b9c;
+      --floor: #080b17;
+      --near-wall: #21152b;
+      --frontier: #5d3df2;
+      --visited: #1e4561;
+      --current: #4b3a00;
+      --path: #12351f;
+      --danger: #ff5272;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 30% 0%, #0c1430 0%, var(--bg) 36%, #02030a 100%);
+      color: var(--text);
+      font-family: Consolas, "Segoe UI", system-ui, sans-serif;
+    }
+
+    .app {
+      width: min(1240px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 22px 0 28px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 20px;
+      align-items: end;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 34px;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .subtitle strong {
+      color: var(--yellow);
+    }
+
+    .badge {
+      padding: 10px 14px;
+      border: 1px solid var(--blue);
+      color: var(--cyan);
+      background: #071126;
+      font-weight: 800;
+      white-space: nowrap;
+      box-shadow: 0 0 16px rgba(0, 183, 255, 0.22);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 760px 1fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .board-panel,
+    .explain-panel {
+      background: rgba(11, 16, 36, 0.96);
+      border: 1px solid var(--line);
+      box-shadow: 0 0 0 2px rgba(0, 183, 255, 0.08);
+    }
+
+    .board-panel {
+      padding: 16px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .tab-btn,
+    button {
+      height: 40px;
+      padding: 0 14px;
+      border: 1px solid var(--blue);
+      background: #071126;
+      color: var(--text);
+      font-family: inherit;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .tab-btn.active,
+    button.active {
+      color: #050713;
+      background: var(--yellow);
+      border-color: var(--yellow);
+      box-shadow: 0 0 12px rgba(255, 228, 77, 0.45);
+    }
+
+    button:hover,
+    .tab-btn:hover {
+      background: #0d1b3e;
+      color: var(--text);
+      box-shadow: 0 0 14px rgba(0, 183, 255, 0.35);
+    }
+
+    button:disabled {
+      cursor: default;
+      opacity: 0.45;
+      box-shadow: none;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .status {
+      min-height: 76px;
+      padding: 12px 14px;
+      background: #060a18;
+      border: 1px solid var(--line);
+      line-height: 1.45;
+      color: var(--text);
+    }
+
+    .status strong {
+      color: var(--yellow);
+    }
+
+    .status .focus {
+      color: var(--cyan);
+      font-weight: 900;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .speed-controls {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      background: #050918;
+    }
+
+    .speed-btn {
+      min-width: 42px;
+      height: 30px;
+      padding: 0 8px;
+      border-color: #314579;
+      font-size: 13px;
+    }
+
+    .placement-label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      margin-left: 4px;
+    }
+
+    .grid-wrap {
+      position: relative;
+      width: max-content;
+      max-width: 100%;
+      margin: 0 auto;
+    }
+
+    .grid {
+      display: grid;
+      gap: 2px;
+      width: max-content;
+      padding: 4px;
+      background: #02040b;
+      border: 2px solid var(--blue);
+      box-shadow: 0 0 20px rgba(0, 183, 255, 0.25);
+    }
+
+    .cell {
+      position: relative;
+      width: 46px;
+      height: 46px;
+      background: var(--floor);
+      border: 1px solid #141b36;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+      transition: background 160ms ease, transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+      user-select: none;
+    }
+
+    .cell.walkable {
+      cursor: pointer;
+    }
+
+    .cell.walkable:hover {
+      border-color: var(--yellow);
+      box-shadow: inset 0 0 0 2px rgba(255, 228, 77, 0.25);
+    }
+
+    .cell.wall {
+      background: var(--wall);
+      border-color: var(--blue);
+      box-shadow: inset 0 0 0 3px #020719, inset 0 0 0 5px var(--blue-2);
+    }
+
+    .cell.cost-high {
+      background: var(--near-wall);
+    }
+
+    .cell.frontier {
+      background: var(--frontier);
+      border-color: #c0b4ff;
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18), 0 0 10px rgba(93, 61, 242, 0.45);
+    }
+
+    .cell.visited {
+      background: var(--visited);
+      border-color: #4bbce7;
+    }
+
+    .cell.current {
+      background: var(--current);
+      transform: scale(1.07);
+      border-color: var(--yellow);
+      box-shadow: 0 0 22px rgba(255, 228, 77, 0.9), inset 0 0 0 3px rgba(255, 228, 77, 0.55);
+      z-index: 3;
+    }
+
+    .cell.path {
+      background: var(--path);
+      border-color: var(--green);
+      box-shadow: inset 0 0 0 3px rgba(86, 242, 143, 0.72), 0 0 12px rgba(86, 242, 143, 0.4);
+    }
+
+    .cell.start {
+      border-color: var(--yellow);
+    }
+
+    .cell.goal {
+      border-color: var(--red);
+    }
+
+    .cell.updated {
+      animation: pulseUpdate 600ms ease;
+    }
+
+    @keyframes pulseUpdate {
+      0% { transform: scale(1); box-shadow: 0 0 0 rgba(34, 240, 255, 0); }
+      50% { transform: scale(1.07); box-shadow: 0 0 20px rgba(34, 240, 255, 0.9); }
+      100% { transform: scale(1); box-shadow: 0 0 0 rgba(34, 240, 255, 0); }
+    }
+
+    .tile-cost {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+      color: #dfe8ff;
+      text-align: center;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .icon {
+      width: 32px;
+      height: 32px;
+      object-fit: contain;
+      image-rendering: pixelated;
+      filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.35));
+      z-index: 4;
+    }
+
+    .fallback-icon {
+      font-size: 23px;
+      line-height: 1;
+      z-index: 4;
+    }
+
+    .route-arrow {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--green);
+      font-size: 25px;
+      opacity: 0.98;
+      pointer-events: none;
+      text-shadow: 0 0 8px rgba(86, 242, 143, 0.95);
+      z-index: 2;
+    }
+
+    .search-arrow {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: rgba(86, 242, 143, 0.55);
+      font-size: 20px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .path-index {
+      position: absolute;
+      right: 5px;
+      bottom: 4px;
+      color: #02050b;
+      background: var(--green);
+      border: 1px solid #d8ffe7;
+      min-width: 18px;
+      height: 18px;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 900;
+      z-index: 3;
+    }
+
+    .callout {
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: rgba(7, 17, 38, 0.94);
+      border: 2px solid var(--yellow);
+      color: var(--yellow);
+      font-size: 14px;
+      line-height: 1.35;
+      font-weight: 900;
+      box-shadow: 0 0 18px rgba(255, 228, 77, 0.3);
+      text-align: center;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 38px;
+      padding: 7px 9px;
+      background: #060a18;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .swatch {
+      width: 18px;
+      height: 18px;
+      border: 1px solid #ffffff66;
+      flex: 0 0 auto;
+    }
+
+    .explain-panel {
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .card {
+      padding: 14px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 19px;
+      color: var(--yellow);
+      letter-spacing: 0;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+
+    .case-note {
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.55;
+      margin: 0;
+    }
+
+    .formula {
+      display: grid;
+      gap: 7px;
+      color: var(--text);
+      font-weight: 900;
+      line-height: 1.55;
+    }
+
+    .formula span {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .steps {
+      display: grid;
+      gap: 8px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 30px 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 10px;
+      background: #070c1d;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      line-height: 1.42;
+      font-size: 14px;
+    }
+
+    .step.active {
+      color: var(--text);
+      border-color: var(--yellow);
+      box-shadow: 0 0 14px rgba(255, 228, 77, 0.22);
+      background: #10152a;
+    }
+
+    .num {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      background: #111a3d;
+      color: var(--cyan);
+      border: 1px solid var(--blue);
+      font-weight: 900;
+    }
+
+    code {
+      color: var(--cyan);
+      background: #050918;
+      padding: 2px 5px;
+      border: 1px solid #1b2b58;
+    }
+
+    @media (max-width: 1120px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .grid-wrap {
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      .legend {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Dijkstra Algorithm Visual Guide</h1>
+        <p class="subtitle">Choose a map, place the ghost and Pac-Man, then run Dijkstra to see the <strong>lowest-cost path</strong>.</p>
+      </div>
+      <div class="badge">Algorithms + Game AI</div>
+    </header>
+
+    <main>
+      <section class="board-panel">
+        <div id="tabs" class="tabs" aria-label="Map cases"></div>
+
+        <div class="topbar">
+          <div id="status" class="status"></div>
+          <div class="controls">
+            <button id="stepBtn">Step</button>
+            <button id="autoBtn">Run</button>
+            <div class="speed-controls" aria-label="Animation speed">
+              <button class="speed-btn active" data-speed="1">x1</button>
+              <button class="speed-btn" data-speed="2">x2</button>
+              <button class="speed-btn" data-speed="4">x4</button>
+              <button class="speed-btn" data-speed="8">x8</button>
+            </div>
+            <button id="ghostModeBtn" class="active">Place Ghost</button>
+            <button id="pacmanModeBtn">Place Pac-Man</button>
+            <button id="resetBtn">Reset</button>
+            <button id="costModeBtn">Edit Cost</button>
+            <span id="placementLabel" class="placement-label">Click a floor tile to move the ghost.</span>
+          </div>
+        </div>
+
+        <div class="grid-wrap">
+          <div id="grid" class="grid" aria-label="Dijkstra grid visualization"></div>
+        </div>
+        <div class="callout" id="callout">Pick a map and press Run.</div>
+
+        <div class="legend">
+          <div class="legend-item"><span class="swatch" style="background: var(--wall)"></span>Wall: blocked</div>
+          <div class="legend-item"><span class="swatch" style="background: var(--frontier)"></span>Frontier: candidates</div>
+          <div class="legend-item"><span class="swatch" style="background: var(--visited)"></span>Visited: finalized</div>
+          <div class="legend-item"><span class="swatch" style="background: var(--path)"></span>Final path arrows</div>
+        </div>
+      </section>
+
+      <aside class="explain-panel">
+        <div class="card">
+          <h2 id="caseTitle">Case</h2>
+          <p id="caseDescription" class="case-note"></p>
+        </div>
+
+        <div class="card">
+          <h2>Core Idea</h2>
+          <p>Dijkstra repeatedly chooses the unvisited tile with the smallest accumulated cost. Once chosen, that tile's best cost is finalized.</p>
+        </div>
+
+        <div class="card">
+          <h2>Update Rule</h2>
+          <div class="formula">
+            new cost = current cost + next tile cost
+            <span>If the new cost is smaller than the old record, update the distance and remember where it came from.</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>What To Notice</h2>
+          <div class="steps">
+            <div id="s0" class="step active"><div class="num">1</div><div><strong>Start</strong> has distance 0. All other walkable tiles begin as unknown.</div></div>
+            <div id="s1" class="step"><div class="num">2</div><div>The purple <strong>frontier</strong> contains candidate tiles we may visit next.</div></div>
+            <div id="s2" class="step"><div class="num">3</div><div>The yellow tile is the <strong>cheapest known tile</strong>. Its neighbors may get better costs.</div></div>
+            <div id="s3" class="step"><div class="num">4</div><div>Green arrows show the returned path from ghost to Pac-Man.</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Game Code Link</h2>
+          <p><code>find_path(cost_map, ghost_pos, pacman_pos)</code> hides this search behind a simple API. The returned list starts at <code>path[0]</code>, moves next to <code>path[1]</code>, and ends at Pac-Man.</p>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+
+    const GHOST_IMAGE_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAABR0lEQVR4nO3duw3CQBBAQYyoBWe0Qzt0QzuIDJqBEhxsMHze5OZOelrpLGNYdtjreHzJ9Zfnc5Hr7+XiKQBXAKwAWAGwAmAFwMZnYH2O16b3EU0AVgCsAFgBsAJgBcAKgG2eYf/9nD+1dZ/QBGAFwAqAFQArAFYArADY0jnfagKwAmAFwAqAFQArAFYA7DD+hMdjdv26jrcwgvffBGAFwAqAFQArAFYArADY9vOA4Tn5dL6Orr/fLqPrP33/TQBWAKwAWAGwAmAFwAqAFQArAFYArABYAbACYAXACoD1fgDWBGAFwAqAFQArAFYArABYAbACYAXACoAVACsAVgCsAFgBsAJgBcAKgBUAKwBWAKwA2Pj3gqb/ozX9XtK3r98EYAXACoAVACsAVgCsANjm+wHTc+7Ur++vCcAKgBUAKwBWAKwAWAGwN6wHN1Igs9IoAAAAAElFTkSuQmCC";
+    const PACMAN_IMAGE_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAABNElEQVR4nO3d0QnDIBRA0aR0gu4/Y1doR/BD5Bo5ZwApXB4oic19Tfp9r9/sGju7P9e9cv3XysUZEyAmQEyAmAAxAWICxIZ73NP3+bNmzwkmICZATICYADEBYgLEBIjd9vlrjc4JJiAmQEyAmAAxAWICxASIOQfETEBMgJgAMQFiAsQEiAkQe9c/YLXV7/fPMgExAWICxASICRATICZA7PHngN33+SMmICZATICYADEBYgLEBIgJEBMgJkBMgJgAMQFiAsQEiB1/P2D35wUmICZATICYADEBYgLEBIgdfw7YnQmICRATICZATICYADEBYo+/H7A7/xu6OQFiAsQEiAkQEyAmQMx3xCb5jtjDCRATICZATICYADEBYtPvzp9+Tlh9v8AExASICRATICZATICYALE/c6IY081p9r0AAAAASUVORK5CYII=";
+
+    const cases = [
+      {
+        id: "equal",
+        name: "Equal Costs",
+        description: "Every floor tile costs 1. Dijkstra behaves like shortest-path search.",
+        map: [
+          "###########",
+          "#S....#...#",
+          "#.###.#.#.#",
+          "#...#...#.#",
+          "###.#####.#",
+          "#...#.....#",
+          "#.#.#.###.#",
+          "#.#.....G.#",
+          "###########"
+        ],
+        costMode: "equal"
+      },
+      {
+        id: "weighted",
+        name: "Weighted Detour",
+        description: "Some tiles are more expensive. The lowest-cost path may avoid high-cost tiles.",
+        map: [
+          "############",
+          "#S11119991G#",
+          "#1####9###1#",
+          "#1111191111#",
+          "#1####9###1#",
+          "#1111111111#",
+          "############"
+        ],
+        costMode: "digits"
+      },
+      {
+        id: "blocked",
+        name: "Blocked Wall",
+        description: "Walls are never candidates. The path must go around them using only four directions.",
+        map: [
+          "###########",
+          "#S1111111G#",
+          "#1#######1#",
+          "#111111111#",
+          "###1#######",
+          "#111111111#",
+          "#1#######1#",
+          "#111111111#",
+          "###########"
+        ],
+        costMode: "digits"
+      },
+      {
+        id: "choice",
+        name: "Cost Choice",
+        description: "Nearby choices can have different costs. Dijkstra expands the cheapest known position first.",
+        map: [
+          "#########",
+          "#1111111#",
+          "#1134111#",
+          "#12S#111#",
+          "#111111G#",
+          "#1111111#",
+          "#########"
+        ],
+        costMode: "digits"
+      },
+      {
+        id: "fourway",
+        name: "Four-Way Move",
+        description: "Pac-Man can be placed in any direction. Dijkstra still searches only up, down, left, and right.",
+        map: [
+          "###########",
+          "#111111111#",
+          "#1###1###1#",
+          "#1111S1111#",
+          "#1###1###1#",
+          "#1111111G1#",
+          "###########"
+        ],
+        costMode: "digits"
+      },
+      {
+        id: "pptcost",
+        name: "1 / 2 Cost Map",
+        description: "This mirrors the slide idea: safe tiles cost 1, near-wall tiles cost 2, walls are blocked.",
+        map: [
+          "###############",
+          "#S12221222111G#",
+          "#2###2#2##X##2#",
+          "#12222222#2221#",
+          "#2#2##2#222#21#",
+          "#1222#222#2221#",
+          "###############"
+        ],
+        costMode: "digits"
+      },
+      {
+        id: "custom",
+        name: "Custom Costs",
+        description: "Use Edit Cost, then click floor tiles to build your own cost map before pressing Run.",
+        map: [
+          "############",
+          "#S11111111G#",
+          "#1##1##1##1#",
+          "#1111111111#",
+          "#1##1##1##1#",
+          "#1111111111#",
+          "############"
+        ],
+        costMode: "digits"
+      }
+    ];
+
+    const gridEl = document.getElementById("grid");
+    const tabsEl = document.getElementById("tabs");
+    const statusEl = document.getElementById("status");
+    const stepBtn = document.getElementById("stepBtn");
+    const autoBtn = document.getElementById("autoBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const costModeBtn = document.getElementById("costModeBtn");
+    const calloutEl = document.getElementById("callout");
+    const ghostModeBtn = document.getElementById("ghostModeBtn");
+    const pacmanModeBtn = document.getElementById("pacmanModeBtn");
+    const placementLabel = document.getElementById("placementLabel");
+    const caseTitle = document.getElementById("caseTitle");
+    const caseDescription = document.getElementById("caseDescription");
+    const speedBtns = [...document.querySelectorAll(".speed-btn")];
+    const stepEls = [0, 1, 2, 3].map((n) => document.getElementById(`s${n}`));
+
+    let activeCaseIndex = 0;
+    let rawMap;
+    let rows;
+    let cols;
+    let start;
+    let goal;
+    let costMap;
+    let distances;
+    let previous;
+    let frontier;
+    let visited;
+    let current;
+    let finalPath;
+    let done;
+    let hasStepped;
+    let lastUpdated;
+    let placementMode = "ghost";
+    let customCosts = new Map();
+    let speedMultiplier = 1;
+    let autoTimer = null;
+    let message;
+
+    function key(pos) {
+      return `${pos[0]},${pos[1]}`;
+    }
+
+    function parseKey(value) {
+      return value.split(",").map(Number);
+    }
+
+    function same(a, b) {
+      return a[0] === b[0] && a[1] === b[1];
+    }
+
+    function findChar(mapData, char) {
+      for (let r = 0; r < mapData.length; r += 1) {
+        const c = mapData[r].indexOf(char);
+        if (c !== -1) return [r, c];
+      }
+      return [1, 1];
+    }
+
+    function tileAt(r, c) {
+      return rawMap[r][c];
+    }
+
+    function isWall(r, c) {
+      return tileAt(r, c) === "#" || tileAt(r, c) === "X";
+    }
+
+    function isWalkable(pos) {
+      const [r, c] = pos;
+      return r >= 0 && r < rows && c >= 0 && c < cols && !isWall(r, c);
+    }
+
+    function cleanTile(char) {
+      return char === "S" || char === "G" ? "1" : char;
+    }
+
+    function neighbors(pos) {
+      const result = [];
+      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        const nr = pos[0] + dr;
+        const nc = pos[1] + dc;
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !isWall(nr, nc)) {
+          result.push([nr, nc]);
+        }
+      }
+      return result;
+    }
+
+    function buildCostMap(caseData) {
+      const costs = [];
+      for (let r = 0; r < rows; r += 1) {
+        const row = [];
+        for (let c = 0; c < cols; c += 1) {
+          const char = cleanTile(rawMap[r][c]);
+          if (char === "#" || char === "X") {
+            row.push(null);
+          } else if (customCosts.has(key([r, c]))) {
+            row.push(customCosts.get(key([r, c])));
+          } else if (caseData.costMode === "digits" && /\d/.test(char)) {
+            row.push(Number(char));
+          } else {
+            row.push(1);
+          }
+        }
+        costs.push(row);
+      }
+      return costs;
+    }
+
+    function setupTabs() {
+      tabsEl.innerHTML = "";
+      cases.forEach((caseData, index) => {
+        const button = document.createElement("button");
+        button.className = `tab-btn${index === activeCaseIndex ? " active" : ""}`;
+        button.textContent = caseData.name;
+        button.addEventListener("click", () => loadCase(index));
+        tabsEl.appendChild(button);
+      });
+    }
+
+    function loadCase(index) {
+      stopAuto();
+      activeCaseIndex = index;
+      const caseData = cases[activeCaseIndex];
+      rawMap = caseData.map.map((line) => line);
+      rows = rawMap.length;
+      cols = rawMap[0].length;
+      start = findChar(rawMap, "S");
+      goal = findChar(rawMap, "G");
+      caseTitle.textContent = caseData.name;
+      caseDescription.textContent = caseData.description;
+      setupTabs();
+      resetCase();
+    }
+
+    function resetCase() {
+      customCosts = new Map();
+      resetSearch();
+    }
+
+    function resetSearch() {
+      stopAuto();
+      const caseData = cases[activeCaseIndex];
+      costMap = buildCostMap(caseData);
+      distances = new Map();
+      previous = new Map();
+      frontier = new Set([key(start)]);
+      visited = new Set();
+      current = null;
+      finalPath = [];
+      done = false;
+      hasStepped = false;
+      lastUpdated = new Set();
+      message = "Start distance is set to 0. Press Step or Run.";
+
+      for (let r = 0; r < rows; r += 1) {
+        for (let c = 0; c < cols; c += 1) {
+          if (!isWall(r, c)) distances.set(key([r, c]), Infinity);
+        }
+      }
+      distances.set(key(start), 0);
+      render();
+    }
+
+    function pickLowestFrontier() {
+      let best = null;
+      let bestCost = Infinity;
+      for (const item of frontier) {
+        const cost = distances.get(item);
+        if (cost < bestCost) {
+          bestCost = cost;
+          best = item;
+        }
+      }
+      return best;
+    }
+
+    function step() {
+      if (done) return;
+      hasStepped = true;
+      lastUpdated = new Set();
+      const picked = pickLowestFrontier();
+      if (picked === null) {
+        done = true;
+        message = "No frontier tiles remain. No path was found.";
+        render();
+        return;
+      }
+
+      frontier.delete(picked);
+      visited.add(picked);
+      current = parseKey(picked);
+
+      if (same(current, goal)) {
+        finalPath = tracePath();
+        done = true;
+        stopAuto();
+        message = "Goal finalized. Green arrows now point from ghost to Pac-Man.";
+        render();
+        return;
+      }
+
+      const updates = [];
+      const currentCost = distances.get(picked);
+      for (const next of neighbors(current)) {
+        const nextKey = key(next);
+        if (visited.has(nextKey)) continue;
+
+        const tileCost = costMap[next[0]][next[1]];
+        const newCost = currentCost + tileCost;
+        if (!distances.has(nextKey)) {
+          distances.set(nextKey, Infinity);
+        }
+        if (newCost < distances.get(nextKey)) {
+          distances.set(nextKey, newCost);
+          previous.set(nextKey, picked);
+          frontier.add(nextKey);
+          lastUpdated.add(nextKey);
+          updates.push(`${format(next)} = ${newCost}`);
+        }
+      }
+
+      message = updates.length
+        ? `Updated: ${updates.join(", ")}`
+        : "Checked neighbors, but no better cost was found.";
+      render();
+    }
+
+    function tracePath() {
+      const path = [];
+      let cursor = key(goal);
+      while (cursor) {
+        path.push(cursor);
+        cursor = previous.get(cursor);
+      }
+      return path.reverse();
+    }
+
+    function format(pos) {
+      return `(${pos[0]}, ${pos[1]})`;
+    }
+
+    function directionFromTo(aKey, bKey) {
+      const [ar, ac] = parseKey(aKey);
+      const [br, bc] = parseKey(bKey);
+      if (br === ar - 1) return "^";
+      if (br === ar + 1) return "v";
+      if (bc === ac - 1) return "<";
+      if (bc === ac + 1) return ">";
+      return "";
+    }
+
+    function searchArrowFor(cellKey) {
+      const prev = previous.get(cellKey);
+      return prev ? directionFromTo(prev, cellKey) : "";
+    }
+
+    function pathArrowFor(cellKey) {
+      const pathKeys = finalPath;
+      const index = pathKeys.indexOf(cellKey);
+      if (index === -1 || index >= pathKeys.length - 1) return "";
+      return directionFromTo(cellKey, pathKeys[index + 1]);
+    }
+
+    function setActiveStep() {
+      stepEls.forEach((el) => el.classList.remove("active"));
+      if (!hasStepped) {
+        stepEls[0].classList.add("active");
+      } else if (finalPath.length) {
+        stepEls[3].classList.add("active");
+      } else if (current) {
+        stepEls[2].classList.add("active");
+      } else if (frontier.size) {
+        stepEls[1].classList.add("active");
+      } else {
+        stepEls[0].classList.add("active");
+      }
+    }
+
+    function handleTileClick(pos) {
+      if (!isWalkable(pos)) return;
+      if (placementMode === "cost") {
+        const tileKey = key(pos);
+        const currentCost = costMap[pos[0]][pos[1]] ?? 1;
+        const cycle = [1, 2, 3, 4, 5, 9, 99];
+        const nextCost = cycle[(cycle.indexOf(currentCost) + 1) % cycle.length];
+        customCosts.set(tileKey, nextCost);
+      } else if (placementMode === "ghost") {
+        start = pos;
+        if (same(start, goal)) goal = findNearestDifferentWalkable(start);
+      } else {
+        goal = pos;
+        if (same(start, goal)) start = findNearestDifferentWalkable(goal);
+      }
+      resetSearch();
+    }
+
+    function findNearestDifferentWalkable(pos) {
+      for (let r = 0; r < rows; r += 1) {
+        for (let c = 0; c < cols; c += 1) {
+          const candidate = [r, c];
+          if (isWalkable(candidate) && !same(candidate, pos)) return candidate;
+        }
+      }
+      return pos;
+    }
+
+    function render() {
+      gridEl.innerHTML = "";
+      gridEl.style.gridTemplateColumns = `repeat(${cols}, 46px)`;
+      gridEl.style.gridTemplateRows = `repeat(${rows}, 46px)`;
+      const pathSet = new Set(finalPath);
+
+      for (let r = 0; r < rows; r += 1) {
+        for (let c = 0; c < cols; c += 1) {
+          const pos = [r, c];
+          const cellKey = key(pos);
+          const cell = document.createElement("div");
+          cell.className = "cell";
+
+          if (isWall(r, c)) {
+            cell.classList.add("wall");
+          } else {
+            cell.classList.add("walkable");
+            if (costMap[r][c] >= 3) cell.classList.add("cost-high");
+            if (frontier.has(cellKey)) cell.classList.add("frontier");
+            if (visited.has(cellKey)) cell.classList.add("visited");
+            if (current && same(current, pos)) cell.classList.add("current");
+            if (pathSet.has(cellKey)) cell.classList.add("path");
+            if (same(pos, start)) cell.classList.add("start");
+            if (same(pos, goal)) cell.classList.add("goal");
+            if (lastUpdated.has(cellKey)) cell.classList.add("updated");
+            cell.addEventListener("click", () => handleTileClick(pos));
+          }
+
+          if (!isWall(r, c)) {
+            const tileCost = document.createElement("div");
+            tileCost.className = "tile-cost";
+            tileCost.textContent = costMap[r][c];
+            cell.appendChild(tileCost);
+          }
+
+          const pathArrow = pathArrowFor(cellKey);
+          const searchArrow = searchArrowFor(cellKey);
+          if (finalPath.length && pathArrow) {
+            const arrowEl = document.createElement("div");
+            arrowEl.className = "route-arrow";
+            arrowEl.textContent = pathArrow;
+            cell.appendChild(arrowEl);
+          } else if (!finalPath.length && searchArrow) {
+            const arrowEl = document.createElement("div");
+            arrowEl.className = "search-arrow";
+            arrowEl.textContent = searchArrow;
+            cell.appendChild(arrowEl);
+          }
+
+          if (same(pos, start)) {
+            const icon = document.createElement("img");
+            icon.className = "icon";
+            icon.src = GHOST_IMAGE_SRC;
+            icon.alt = "Ghost start";
+            icon.onerror = () => {
+              const fallback = document.createElement("div");
+              fallback.className = "fallback-icon";
+              fallback.textContent = "G";
+              fallback.style.color = "var(--red)";
+              icon.replaceWith(fallback);
+            };
+            cell.appendChild(icon);
+          } else if (same(pos, goal)) {
+            const icon = document.createElement("img");
+            icon.className = "icon";
+            icon.src = PACMAN_IMAGE_SRC;
+            icon.alt = "Pac-Man goal";
+            icon.onerror = () => {
+              const fallback = document.createElement("div");
+              fallback.className = "fallback-icon";
+              fallback.textContent = "P";
+              fallback.style.color = "var(--yellow)";
+              icon.replaceWith(fallback);
+            };
+            cell.appendChild(icon);
+          }
+
+          if (finalPath.length && pathSet.has(cellKey)) {
+            const index = document.createElement("div");
+            index.className = "path-index";
+            index.textContent = finalPath.indexOf(cellKey);
+            cell.appendChild(index);
+          }
+
+          gridEl.appendChild(cell);
+        }
+      }
+
+      const pickedText = current
+        ? `Current finalized tile: <strong>${format(current)}</strong>`
+        : "No tile has been finalized yet.";
+      const frontierText = `Frontier candidates: <span class="focus">${frontier.size}</span>`;
+      const pathText = finalPath.length ? ` Final path length: <strong>${finalPath.length}</strong> tiles.` : "";
+      statusEl.innerHTML = `${pickedText}<br>${frontierText} | ${message}${pathText}`;
+      calloutEl.textContent = finalPath.length
+        ? "Green arrows point from ghost to Pac-Man."
+        : current
+          ? "Yellow = current cheapest known tile."
+          : "Click tiles to place characters, then press Run.";
+      stepBtn.disabled = done;
+      setActiveStep();
+    }
+
+    function startAuto() {
+      if (autoTimer) return;
+      if (done) resetSearch();
+      autoBtn.textContent = "Pause";
+      autoTimer = window.setInterval(step, 650 / speedMultiplier);
+    }
+
+    function stopAuto() {
+      if (autoTimer) {
+        window.clearInterval(autoTimer);
+        autoTimer = null;
+      }
+      autoBtn.textContent = "Run";
+    }
+
+    function setSpeed(multiplier) {
+      speedMultiplier = multiplier;
+      speedBtns.forEach((button) => {
+        button.classList.toggle("active", Number(button.dataset.speed) === speedMultiplier);
+      });
+      if (autoTimer) {
+        stopAuto();
+        startAuto();
+      }
+    }
+
+    function setPlacementMode(mode) {
+      placementMode = mode;
+      ghostModeBtn.classList.toggle("active", mode === "ghost");
+      pacmanModeBtn.classList.toggle("active", mode === "pacman");
+      costModeBtn.classList.toggle("active", mode === "cost");
+      placementLabel.textContent = mode === "ghost"
+        ? "Click a floor tile to move the ghost."
+        : mode === "pacman"
+          ? "Click a floor tile to move Pac-Man."
+          : "Click a floor tile to cycle its cost: 1, 2, 3, 4, 5, 9, 99.";
+    }
+
+    stepBtn.addEventListener("click", step);
+    autoBtn.addEventListener("click", () => {
+      if (autoTimer) {
+        stopAuto();
+      } else {
+        startAuto();
+      }
+    });
+    resetBtn.addEventListener("click", resetCase);
+    ghostModeBtn.addEventListener("click", () => setPlacementMode("ghost"));
+    pacmanModeBtn.addEventListener("click", () => setPlacementMode("pacman"));
+    costModeBtn.addEventListener("click", () => setPlacementMode("cost"));
+    speedBtns.forEach((button) => {
+      button.addEventListener("click", () => setSpeed(Number(button.dataset.speed)));
+    });
+
+    loadCase(0);
+  </script>
+</body>
+</html>

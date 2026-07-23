@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Interactive Game AI lesson for high-school students: FSM and Dijkstra pathfinding.">
+  <title>Game AI Lab · FSM &amp; Dijkstra</title>
+  <script>
+    (() => {
+      const key = "game-ai-lab-theme-v1";
+      try {
+        const saved = localStorage.getItem(key);
+        const theme = saved === "dark" || saved === "light"
+          ? saved
+          : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      } catch (_) {
+        document.documentElement.dataset.theme = "light";
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#mainContent">Skip to lesson</a>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Game AI Lab home">
+        <span class="brand-mark"><img src="assets/maze-runner-open.svg" alt=""></span>
+        <span><strong>Game AI Lab</strong><small>Lecture 4 · FSM &amp; Dijkstra</small></span>
+      </a>
+      <div class="course-progress" id="courseProgress" role="progressbar" aria-label="Course progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="progress-copy"><span id="progressLabel">MISSION 1 / 11</span><strong id="progressPercent">0%</strong></div>
+        <div class="progress-track"><span id="progressBar"></span></div>
+      </div>
+      <div class="top-actions">
+        <button class="icon-button" id="themeToggleBtn" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false"><span id="themeIcon" aria-hidden="true">☾</span></button>
+        <button class="icon-button" id="resetProgressBtn" title="Reset course progress" aria-label="Reset course progress">↻</button>
+      </div>
+    </header>
+
+    <aside class="syllabus-panel" aria-label="Lesson missions">
+      <div class="syllabus-head">
+        <span class="eyebrow">Today’s studio</span>
+        <h1>Smart Monster AI</h1>
+        <p>Decide <em>when</em> to chase, then calculate <em>where</em> to move.</p>
+      </div>
+      <div class="course-meta">
+        <span>FULL COURSE</span>
+      </div>
+      <nav id="missionNav" class="mission-nav"></nav>
+      <div class="sidebar-note">
+        <span>Core formula</span>
+        <code>new_cost = current + tile_cost</code>
+      </div>
+    </aside>
+
+    <main class="lesson-panel" id="mainContent" tabindex="-1">
+      <div class="mission-kicker">
+        <span id="missionPhase">01 · PROBLEM</span>
+      </div>
+      <h2 id="missionTitle">Why does a monster need AI?</h2>
+      <p id="missionLead" class="mission-lead"></p>
+
+      <section class="concept-card" id="conceptCard" aria-labelledby="conceptTitle">
+        <div class="concept-icon" id="conceptIcon">?</div>
+        <div>
+          <span class="card-label">Key idea</span>
+          <h3 id="conceptTitle"></h3>
+          <p id="conceptText"></p>
+        </div>
+      </section>
+
+      <section class="code-reference" id="codeReference" hidden aria-labelledby="codeReferenceTitle"></section>
+
+      <section class="mission-guide" id="missionGuide" hidden></section>
+
+      <section class="task-card" aria-labelledby="taskTitle">
+        <div class="task-head">
+          <div><span class="card-label">Your task</span><h3 id="taskTitle"></h3></div>
+          <div class="attempts" id="attemptsLabel">0 attempts</div>
+        </div>
+        <p id="taskPrompt" class="task-prompt"></p>
+        <div id="answerArea" class="answer-area"></div>
+        <div id="hintHistory" class="hint-history" aria-live="polite"></div>
+        <div id="feedback" class="feedback" role="status" aria-live="polite"></div>
+        <div class="task-actions">
+          <button class="button skip" id="skipBtn">Skip mission</button>
+          <button class="button ghost" id="hintBtn">Hint <span id="hintCount">0/3</span></button>
+          <button class="button primary" id="checkBtn">Check answer</button>
+        </div>
+      </section>
+
+      <div class="lesson-footer">
+        <button class="text-button" id="prevBtn">← Previous</button>
+        <span id="saveState">Progress saves automatically</span>
+        <button class="button next" id="nextBtn" disabled>Next mission →</button>
+      </div>
+    </main>
+
+    <aside class="lab-panel">
+      <div class="lab-head">
+        <div><span class="eyebrow">Live lab</span><h2>See the algorithm think</h2></div>
+        <div class="lab-tabs" role="tablist" aria-label="Lab view">
+          <button id="fsmTab" class="lab-tab active" role="tab" aria-controls="fsmLab" aria-selected="true">FSM</button>
+          <button id="matrixTab" class="lab-tab" role="tab" aria-controls="matrixLab" aria-selected="false" tabindex="-1">Map</button>
+          <button id="pathTab" class="lab-tab" role="tab" aria-controls="pathLab" aria-selected="false" tabindex="-1">Path</button>
+          <button id="playTab" class="lab-tab" role="tab" aria-controls="playLab" aria-selected="false" tabindex="-1">Play</button>
+        </div>
+      </div>
+
+      <section id="fsmLab" class="lab-view active" role="tabpanel" aria-labelledby="fsmTab">
+        <div class="fsm-scene">
+          <div class="distance-line" id="distanceLine"><span class="ghost-token"><img src="assets/ghost-coral.svg" alt="Ghost"></span><span class="distance-dots"></span><span class="player-token"><img src="assets/maze-runner-open.svg" alt="Maze runner"></span></div>
+          <div class="distance-readout"><label for="distanceSlider">distance_to_player</label><strong id="distanceValue">230</strong></div>
+          <input id="distanceSlider" type="range" min="0" max="300" value="230" aria-label="Distance to player">
+        </div>
+        <div class="state-flow">
+          <article class="state-card" data-state="PATROL"><span>PATROL</span><small>distance &gt;= 200</small></article>
+          <span class="flow-arrow">→</span>
+          <article class="state-card" data-state="CHASE"><span>CHASE</span><small>50 &lt;= distance &lt; 200</small></article>
+          <span class="flow-arrow">→</span>
+          <article class="state-card" data-state="ATTACK"><span>ATTACK</span><small>distance &lt; 50</small></article>
+        </div>
+        <div class="lab-status"><span>CURRENT STATE</span><strong id="currentState">PATROL</strong><p id="stateReason">The player is far away, so the monster patrols.</p></div>
+        <div class="mini-code"><span>Specific condition first</span><pre><code>if distance &lt; 50:       ATTACK
+elif distance &lt; 200:    CHASE
+else:                    PATROL</code></pre></div>
+      </section>
+
+      <section id="matrixLab" class="lab-view" role="tabpanel" aria-labelledby="matrixTab" hidden>
+        <div class="matrix-lab-head">
+          <span class="card-label">Student-built map</span>
+          <h3>Matrix → Pac-Man board</h3>
+          <p>Use <code>0</code> for paths, <code>1</code> for walls, and the strings <code>"P"</code>, <code>"G1"</code>, <code>"G2"</code> for character starts. One automatic wall is added around the matrix.</p>
+          <button class="button primary" id="runMatrixLabBtn">Run current code</button>
+        </div>
+        <div class="matrix-stage">
+          <div id="matrixGrid" class="matrix-grid empty" aria-label="Student matrix map preview">
+            <span>Run an N × N matrix to build the map.</span>
+          </div>
+        </div>
+        <div class="matrix-legend" aria-label="Matrix value legend">
+          <span><i class="matrix-floor-key"></i><code>0</code> Pellet path</span>
+          <span><i class="matrix-wall-key"></i><code>1</code> Maze wall</span>
+          <span><img src="assets/maze-runner-open.svg" alt=""><code>"P"</code> Pac-Man</span>
+          <span><img src="assets/ghost-coral.svg" alt=""><code>"G1"</code> Ghost 1</span>
+          <span><img src="assets/ghost-blue.svg" alt=""><code>"G2"</code> Ghost 2</span>
+          <span><i class="matrix-boundary-key"></i>Auto border</span>
+        </div>
+        <div class="metrics matrix-metrics">
+          <div><span>BOARD</span><strong id="matrixSize">—</strong></div>
+          <div><span>PATHS</span><strong id="matrixFloor">0</strong></div>
+          <div><span>WALLS</span><strong id="matrixWalls">0</strong></div>
+        </div>
+        <div class="matrix-coordinates" aria-label="Character matrix coordinates">
+          <div><span>PAC-MAN</span><strong id="matrixPacmanPos">—</strong></div>
+          <div><span>GHOST 1</span><strong id="matrixGhostPos">—</strong></div>
+          <div><span>GHOST 2</span><strong id="matrixGhost2Pos">—</strong></div>
+          <div><span>GET_DISTANCE</span><strong id="matrixDistance">—</strong></div>
+        </div>
+        <div id="matrixStatus" class="path-status">No matrix has been run yet.</div>
+      </section>
+
+      <section id="pathLab" class="lab-view" role="tabpanel" aria-labelledby="pathTab" hidden>
+        <div class="guide-launch">
+          <div>
+            <span class="guide-launch-label">Full visual guide</span>
+            <strong>Explore all 7 Dijkstra cases</strong>
+            <p>Place the ghost and Pac-Man, edit tile costs, and watch every search decision.</p>
+          </div>
+          <button class="button primary" id="openDijkstraGuideBtn">Open guide</button>
+        </div>
+        <div class="map-tabs" id="mapTabs" aria-label="Pathfinding map"></div>
+        <div class="path-controls">
+          <button class="small-button" id="stepPathBtn">Step</button>
+          <button class="small-button primary-small" id="runPathBtn">Run</button>
+          <button class="small-button" id="resetPathBtn">Reset</button>
+          <button class="small-button" id="editCostBtn">Edit cost</button>
+          <select id="speedSelect" aria-label="Animation speed"><option value="650">1×</option><option value="300">2×</option><option value="120">4×</option></select>
+        </div>
+        <div id="pathStatus" class="path-status">Start has cost 0. Press Step or Run.</div>
+        <div class="grid-stage"><div id="pathGrid" class="path-grid" aria-label="Dijkstra pathfinding grid"></div></div>
+        <div class="legend">
+          <span><i class="frontier-key"></i>Frontier</span>
+          <span><i class="visited-key"></i>Visited</span>
+          <span><i class="current-key"></i>Current</span>
+          <span><i class="path-key"></i>Path</span>
+        </div>
+        <div class="metrics">
+          <div><span>FRONTIER</span><strong id="frontierMetric">1</strong></div>
+          <div><span>VISITED</span><strong id="visitedMetric">0</strong></div>
+          <div><span>PATH COST</span><strong id="costMetric">—</strong></div>
+        </div>
+      </section>
+
+      <section id="playLab" class="lab-view" role="tabpanel" aria-labelledby="playTab" hidden>
+        <div class="game-hud">
+          <div><span>SCORE</span><strong id="gameScore">0</strong></div>
+          <div><span>LIVES</span><strong id="gameLives">● ● ●</strong></div>
+          <div><span>LOGIC BUILT</span><strong id="aiBuild">0 / 11</strong></div>
+          <div class="game-state-main"><span>GHOST STATE</span><strong id="gameMainState">PATROL</strong></div>
+        </div>
+        <div class="game-controls">
+          <button class="small-button primary-small" id="gamePlayBtn">Play</button>
+          <button class="small-button" id="gamePauseBtn">Pause</button>
+          <button class="small-button" id="gameRestartBtn">Restart</button>
+          <button class="small-button active" id="gameSoundBtn">Sound on</button>
+          <select id="gameMapSelect" aria-label="Game map"><option value="0">Maze A</option><option value="1">Maze B</option><option value="2" id="studentMapOption" disabled>Student map · build first</option></select>
+        </div>
+        <div class="runtime-status" id="runtimeStatus" data-ready="false" role="status">
+          <span>VALIDATED LOGIC</span>
+          <strong>AI build in progress</strong>
+          <small>Correctly submitted missions power the playable ghosts.</small>
+        </div>
+        <div class="game-stage">
+          <canvas id="gameCanvas" width="680" height="600" tabindex="0" aria-label="Playable Pac-Man game"></canvas>
+          <div id="gameOverlay" class="game-overlay show">
+            <strong>READY?</strong>
+            <span>Arrow keys or W A S D</span>
+            <button id="overlayPlayBtn">START GAME</button>
+          </div>
+        </div>
+        <div class="ghost-monitor" id="ghostMonitor"></div>
+        <div class="ai-feature-list" id="aiFeatureList"></div>
+        <p class="game-note">The game runtime mirrors the validated Python logic: FSM chooses the state, CHASE calls Dijkstra, and <code>path[1]</code> becomes the ghost's next tile.</p>
+      </section>
+    </aside>
+  </div>
+
+  <dialog id="completeDialog" class="complete-dialog">
+    <div class="complete-orbit"><span>✓</span></div>
+    <span class="eyebrow">MISSION COMPLETE</span>
+    <h2>You built a smart monster.</h2>
+    <p>FSM decides <strong>when</strong> to chase. Dijkstra decides <strong>which path</strong> to take.</p>
+    <div class="result-grid">
+      <div><span>COURSE</span><strong>SMART MONSTER AI</strong></div>
+      <div><span>MISSIONS</span><strong id="resultMissions">11 / 11</strong></div>
+      <div><span>SKIPPED</span><strong id="resultSkipped">0</strong></div>
+      <div><span>HINTS USED</span><strong id="resultHints"></strong></div>
+    </div>
+    <button class="button primary" id="closeCompleteBtn">Return to lab</button>
+  </dialog>
+
+  <dialog id="dijkstraGuideDialog" class="dijkstra-guide-dialog" aria-labelledby="dijkstraGuideTitle">
+    <div class="guide-dialog-bar">
+      <div>
+        <strong id="dijkstraGuideTitle">Dijkstra Visual Guide</strong>
+        <span>Complete interactive guide · 7 map cases</span>
+      </div>
+      <button class="guide-close" id="closeDijkstraGuideBtn" aria-label="Close Dijkstra visual guide">Close</button>
+    </div>
+    <iframe id="dijkstraGuideFrame" src="dijkstra_visual_guide.html" title="Interactive Dijkstra Algorithm Visual Guide"></iframe>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
