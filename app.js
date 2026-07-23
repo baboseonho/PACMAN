@@ -372,9 +372,54 @@
   ];
 
 
+  // Offline Python syntax highlighting: a colored layer rendered behind a
+  // transparent textarea, VS Code Dark+ palette. No libraries, works offline.
+  const PY_CONTROL = new Set(["if", "elif", "else", "for", "while", "return", "break", "continue", "pass"]);
+  const PY_KEYWORD = new Set(["def", "class", "lambda", "in", "and", "or", "not", "is", "import", "from", "as", "with", "try", "except", "global", "del"]);
+  const PY_CONSTANT = new Set(["None", "True", "False"]);
+  const PY_BUILTIN = new Set(["abs", "len", "min", "max", "range", "print", "sum", "sorted", "int", "float", "str", "list", "dict", "set", "tuple"]);
+
+  function escapeHtml(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function highlightPython(source) {
+    const pattern = /(#[^\n]*)|("""[\s\S]*?(?:"""|$)|'''[\s\S]*?(?:'''|$)|"(?:\\.|[^"\\\n])*(?:"|$)|'(?:\\.|[^'\\\n])*(?:'|$))|(\b\d+(?:\.\d+)?\b)|([A-Za-z_]\w*)|(==|!=|<=|>=|->|[+\-*/%<>=])/g;
+    let out = "";
+    let last = 0;
+    let match;
+    while ((match = pattern.exec(source))) {
+      out += escapeHtml(source.slice(last, match.index));
+      last = pattern.lastIndex;
+      const [text, comment, string, number, word, operator] = match;
+      let cls = "";
+      if (comment) cls = "comment";
+      else if (string) cls = "string";
+      else if (number) cls = "number";
+      else if (word) {
+        if (PY_CONTROL.has(word)) cls = "control";
+        else if (PY_KEYWORD.has(word)) cls = "keyword";
+        else if (PY_CONSTANT.has(word)) cls = "constant";
+        else if (PY_BUILTIN.has(word)) cls = "builtin";
+        else if (/^[A-Z][A-Z0-9_]*$/.test(word)) cls = "caps";
+        else if (/^\s*\(/.test(source.slice(last))) cls = "func";
+      } else if (operator) cls = "op";
+      out += cls ? `<span class="tok-${cls}">${escapeHtml(text)}</span>` : escapeHtml(text);
+    }
+    out += escapeHtml(source.slice(last));
+    return out;
+  }
+
   function renderCode(task, draft) {
     const editor = document.createElement("div");
     editor.className = "code-editor";
+    const surface = document.createElement("div");
+    surface.className = "code-surface";
+    const highlight = document.createElement("pre");
+    highlight.className = "code-highlight";
+    highlight.setAttribute("aria-hidden", "true");
+    const highlightCode = document.createElement("code");
+    highlight.append(highlightCode);
     const textarea = document.createElement("textarea");
     textarea.className = "code-input";
     textarea.spellcheck = false;
@@ -483,9 +528,15 @@
       textarea.setAttribute("aria-expanded", "true");
       textarea.setAttribute("aria-activedescendant", suggestions.firstElementChild.id);
     };
+    const renderHighlight = () => {
+      highlightCode.innerHTML = highlightPython(textarea.value + "\n");
+      highlight.scrollTop = textarea.scrollTop;
+    };
+    textarea.addEventListener("scroll", () => { highlight.scrollTop = textarea.scrollTop; });
     textarea.addEventListener("input", () => {
       profile().drafts[mission().id] = textarea.value;
       saveStore();
+      renderHighlight();
       resizeEditor();
       updateSuggestions();
     });
@@ -524,13 +575,15 @@
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) checkAnswer();
     });
     textarea.addEventListener("blur", () => window.setTimeout(hideSuggestions, 120));
-    editor.append(textarea, suggestions);
+    surface.append(highlight, textarea);
+    editor.append(surface, suggestions);
     els.answerArea.append(editor);
     const note = document.createElement("div");
     note.className = "task-note";
     note.textContent = "Autocomplete suggests Python keywords and names already used above. Your operators and code are never changed.";
     els.answerArea.append(note);
     requestAnimationFrame(() => {
+      renderHighlight();
       resizeEditor();
       textarea.setSelectionRange(textarea.value.length, textarea.value.length);
     });

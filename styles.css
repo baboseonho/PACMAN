@@ -2049,3 +2049,53 @@ body,
 .matrix-cell.coin.runner::after,
 .matrix-cell.coin.ghost::after { display: none; }
 :root[data-theme="dark"] .matrix-cell.coin { background: #050713; }
+
+/* Offline Python syntax highlighting (VS Code Dark+ palette) */
+.code-surface { position: relative; }
+.code-highlight {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 15px;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  background: var(--code);
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--code-text);
+  font: 14px/1.65 var(--font-code);
+  tab-size: 4;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.code-highlight code {
+  display: block;
+  font: inherit;
+  white-space: inherit;
+  overflow-wrap: inherit;
+}
+.code-surface .code-input {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--yellow);
+  overflow-wrap: break-word;
+}
+.code-surface .code-input::selection {
+  background: rgb(75 145 255 / 35%);
+  color: transparent;
+}
+.tok-comment { color: #6a9955; font-style: italic; }
+.tok-string { color: #ce9178; }
+.tok-number { color: #b5cea8; }
+.tok-keyword { color: #569cd6; }
+.tok-control { color: #c586c0; }
+.tok-constant { color: #569cd6; }
+.tok-caps { color: #4fc1ff; }
+.tok-builtin { color: #4ec9b0; }
+.tok-func { color: #dcdcaa; }
+.tok-op { color: #d4d4d4; }
+@media (max-width: 640px) {
+  .code-highlight { font-size: 13px; }
+}
