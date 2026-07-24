@@ -2019,7 +2019,9 @@
     const complete = completedSet();
     const ghostRow = Math.floor(ghost.y), ghostCol = Math.floor(ghost.x);
     const playerRow = Math.floor(game.player.y), playerCol = Math.floor(game.player.x);
-    const distance = (Math.abs(ghostRow - playerRow) + Math.abs(ghostCol - playerCol)) * 25;
+    // 12 units per tile: with the default ranges CHASE engages within ~16 tiles
+    // (most of the maze) and ATTACK within ~4 tiles, so ghosts visibly hunt.
+    const distance = (Math.abs(ghostRow - playerRow) + Math.abs(ghostCol - playerCol)) * 12;
     ghost.distance = distance;
     if (!complete.has("conditions") || !complete.has("distance")) return "PATROL";
     // Mission 11 lets students tune these constants; defaults match the lecture.
@@ -2148,7 +2150,9 @@
       if (!canMove(row, col, ghost.dir)) ghost.dir = chooseGhostDirection(ghost, row, col);
     }
     const complete = completedSet();
-    const base = ghost.state === "ATTACK" ? 2.55 : ghost.state === "CHASE" ? 2.25 : 1.8;
+    // Player moves at 3.25; a hunting ghost stays close (CHASE/ATTACK) but never faster,
+    // so the maze stays winnable. PATROL wanders slowly.
+    const base = ghost.state === "ATTACK" ? 2.8 : ghost.state === "CHASE" ? 2.55 : 1.8;
     // Sticky slime always halves ghost speed (cost 2 = two ticks per tile); Pac-Man hops across freely.
     const terrain = isGameSlime(Math.floor(ghost.y), Math.floor(ghost.x)) ? .5 : 1;
     const fright = ghost.state === "FRIGHTENED" && game.powerTimer > 0 ? .62 : 1;
