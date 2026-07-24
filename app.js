@@ -1500,7 +1500,7 @@
     const validGrid = saved?.grid?.length >= 8 && saved.grid.length <= 25 && saved.grid.every((row) => Array.isArray(row) && row.length === saved.grid.length);
     if (validGrid) {
       builder.size = saved.grid.length;
-      builder.grid = saved.grid.map((row) => row.map((value) => value === 1 || value === 2 || value === 3 ? value : 0));
+      builder.grid = saved.grid.map((row) => row.map((value) => value === 1 || value === 2 ? value : 0));
       const inside = (pos) => Array.isArray(pos) && pos[0] >= 0 && pos[0] < builder.size && pos[1] >= 0 && pos[1] < builder.size ? [pos[0], pos[1]] : null;
       builder.pacman = inside(saved.pacman);
       builder.ghosts = [0, 1].map((index) => inside(saved.ghosts?.[index]));
@@ -1545,10 +1545,10 @@
     const cell = builder.cells[row]?.[col];
     if (!cell) return;
     const value = builder.grid[row][col];
-    cell.className = `matrix-cell build-cell ${value === 1 ? "wall" : value === 2 ? "slime" : value === 3 ? "coin" : "floor"}`;
+    cell.className = `matrix-cell build-cell ${value === 1 ? "wall" : value === 2 ? "slime" : "floor"}`;
     cell.replaceChildren();
     const marker = builderMarkerAt(row, col);
-    const tileName = value === 1 ? "wall" : value === 2 ? "slime (ghosts cross at half speed)" : value === 3 ? "coin (bonus, 50 points)" : "pellet path";
+    const tileName = value === 1 ? "wall" : value === 2 ? "slime (ghosts cross at half speed)" : "pellet path";
     cell.title = marker ? `row ${row}, column ${col}: ${marker === "P" ? "Pac-Man start" : marker + " start"}` : `row ${row}, column ${col}: ${tileName}`;
     if (marker) {
       cell.classList.add(marker === "P" ? "runner" : "ghost");
@@ -1581,8 +1581,8 @@
 
   function applyBuilderTool(row, col) {
     const refresh = [[row, col]];
-    if (builder.tool === "wall" || builder.tool === "floor" || builder.tool === "slime" || builder.tool === "coin") {
-      builder.grid[row][col] = builder.tool === "wall" ? 1 : builder.tool === "slime" ? 2 : builder.tool === "coin" ? 3 : 0;
+    if (builder.tool === "wall" || builder.tool === "floor" || builder.tool === "slime") {
+      builder.grid[row][col] = builder.tool === "wall" ? 1 : builder.tool === "slime" ? 2 : 0;
       if (builder.tool === "wall") {
         if (builderMarkerAt(row, col) === "P") builder.pacman = null;
         builder.ghosts = builder.ghosts.map((pos) => pos && pos[0] === row && pos[1] === col ? null : pos);
@@ -1606,13 +1606,12 @@
   }
 
   function builderCounts() {
-    let walls = 0, slime = 0, coins = 0;
+    let walls = 0, slime = 0;
     builder.grid.forEach((row) => row.forEach((value) => {
       if (value === 1) walls += 1;
       if (value === 2) slime += 1;
-      if (value === 3) coins += 1;
     }));
-    return { walls, slime, coins };
+    return { walls, slime };
   }
 
   function builderReachable() {
@@ -1663,9 +1662,9 @@
       els.buildStatus.textContent = message;
       return;
     }
-    const { walls, slime, coins } = builderCounts();
+    const { walls, slime } = builderCounts();
     const markers = [builder.pacman ? "P ✓" : "P —", builder.ghosts[0] ? "G1 ✓" : "G1 —", builder.ghosts[1] ? "G2 ✓" : "G2 —"].join(" · ");
-    els.buildStatus.textContent = `${builder.size} × ${builder.size} board · ${walls} walls · ${slime} slime · ${coins} coins · ${markers}. An automatic border wall and pellets are added at play time.`;
+    els.buildStatus.textContent = `${builder.size} × ${builder.size} board · ${walls} walls · ${slime} slime · ${markers}. Border walls, pellets, and random power coins are added at play time.`;
   }
 
   function playgroundGameRows() {
@@ -1676,7 +1675,7 @@
       if (marker === "P") return "P";
       if (marker === "G1") return "A";
       if (marker === "G2") return "B";
-      return value === 1 ? "#" : value === 2 ? "~" : value === 3 ? "o" : ".";
+      return value === 1 ? "#" : value === 2 ? "~" : ".";
     }).join("")}#`);
     return [border, ...rows, border];
   }
@@ -1778,7 +1777,7 @@
 
   const DIRS = { UP: { x: 0, y: -1 }, DOWN: { x: 0, y: 1 }, LEFT: { x: -1, y: 0 }, RIGHT: { x: 1, y: 0 }, NONE: { x: 0, y: 0 } };
   const game = {
-    mapIndex: 0, map: [], playerStart: null, ghostStarts: [], player: null, ghosts: [], pellets: new Set(), coins: new Set(), score: 0, lives: 3,
+    mapIndex: 0, map: [], playerStart: null, ghostStarts: [], player: null, ghosts: [], pellets: new Set(), coins: new Set(), powerTimer: 0, score: 0, lives: 3,
     running: false, paused: false, sound: true, lastTime: 0, tick: 0, audio: null, lastStateSound: 0, message: "READY?"
   };
   const gameCtx = els.gameCanvas.getContext("2d");
@@ -1821,7 +1820,7 @@
     return {
       x: start[1] + .5, y: start[0] + .5, start: [...start], dir: { ...DIRS.NONE }, desired: { ...DIRS.NONE },
       kind, index, state: "PATROL", lastDecision: "", cachedPath: [], debugPath: [], color: index === 0 ? "#ff6f7d" : "#65bcff",
-      action: "patrol()", distance: Infinity, pathCost: null, replans: 0, lastCenter: ""
+      action: "patrol()", distance: Infinity, pathCost: null, replans: 0, lastCenter: "", frightImmune: false
     };
   }
 
@@ -1860,6 +1859,21 @@
       game.pellets = new Set([...game.pellets].filter((key) => reachable.has(key)));
       game.coins = new Set([...game.coins].filter((key) => reachable.has(key)));
     }
+    // Classic power pellets: each round, a few random pellets (away from Pac-Man's
+    // start) become power coins. Eating one lets Pac-Man hunt the ghosts.
+    if (game.playerStart) {
+      const pool = [...game.pellets].filter((key) => {
+        const [row, col] = key.split(",").map(Number);
+        return Math.abs(row - game.playerStart[0]) + Math.abs(col - game.playerStart[1]) >= 4;
+      });
+      const powerCount = Math.min(pool.length >= 70 ? 4 : 3, pool.length);
+      for (let i = 0; i < powerCount; i += 1) {
+        const pick = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+        game.pellets.delete(pick);
+        game.coins.add(pick);
+      }
+    }
+    game.powerTimer = 0;
     if (!keepScore) { game.score = 0; game.lives = 3; }
     game.running = false;
     game.paused = false;
@@ -1958,7 +1972,9 @@
     }
     if (game.coins.delete(key)) {
       game.score += 50;
-      playCue("coin");
+      game.powerTimer = 7;
+      game.ghosts.forEach((ghost) => { ghost.frightImmune = false; ghost.cachedPath = []; });
+      playCue("power");
       collected = true;
     }
     if (!collected) return;
@@ -2026,6 +2042,22 @@
     const legal = legalDirections(row, col, reverse);
     if (!legal.length) return { ...DIRS.NONE };
 
+    // Power mode: frightened ghosts drop their plans and flee from Pac-Man.
+    if (game.powerTimer > 0 && !ghost.frightImmune) {
+      ghost.state = "FRIGHTENED";
+      ghost.action = "flee() · power coin active";
+      ghost.cachedPath = [];
+      ghost.debugPath = [];
+      ghost.pathCost = null;
+      const away = [Math.floor(game.player.y), Math.floor(game.player.x)];
+      legal.sort((a, b) => {
+        const da = Math.abs(row + a.dir.y - away[0]) + Math.abs(col + a.dir.x - away[1]);
+        const db = Math.abs(row + b.dir.y - away[0]) + Math.abs(col + b.dir.x - away[1]);
+        return db - da;
+      });
+      return { ...legal[0].dir };
+    }
+
     if (ghost.state === "PATROL") {
       ghost.action = "patrol() · junction turns";
       ghost.debugPath = [];
@@ -2085,7 +2117,8 @@
     const base = ghost.state === "ATTACK" ? 2.55 : ghost.state === "CHASE" ? 2.25 : 1.8;
     // Sticky slime always halves ghost speed (cost 2 = two ticks per tile); Pac-Man hops across freely.
     const terrain = isGameSlime(Math.floor(ghost.y), Math.floor(ghost.x)) ? .5 : 1;
-    const speed = (base + (complete.has("integration") ? .22 : 0)) * terrain;
+    const fright = ghost.state === "FRIGHTENED" && game.powerTimer > 0 ? .62 : 1;
+    const speed = (base + (complete.has("integration") ? .22 : 0)) * terrain * fright;
     ghost.x += ghost.dir.x * speed * dt;
     ghost.y += ghost.dir.y * speed * dt;
   }
@@ -2126,8 +2159,21 @@
   }
 
   function checkGameCollision() {
-    const hit = game.ghosts.some((ghost) => Math.hypot(ghost.x - game.player.x, ghost.y - game.player.y) < .55);
-    if (!hit) return;
+    let lifeLost = false;
+    game.ghosts.forEach((ghost) => {
+      if (Math.hypot(ghost.x - game.player.x, ghost.y - game.player.y) >= .55) return;
+      if (game.powerTimer > 0 && !ghost.frightImmune) {
+        // Power mode: Pac-Man eats the ghost, which respawns at its start tile.
+        game.score += 200;
+        Object.assign(ghost, makeEntity(ghost.start, "ghost", ghost.index));
+        ghost.frightImmune = true;
+        playCue("ghostEaten");
+        return;
+      }
+      lifeLost = true;
+    });
+    if (!lifeLost) return;
+    game.powerTimer = 0;
     game.lives -= 1;
     game.running = false;
     playCue(game.lives <= 0 ? "gameOver" : "lifeLost");
@@ -2143,6 +2189,10 @@
   function updateGame(dt) {
     movePlayer(dt);
     game.ghosts.forEach((ghost) => moveGhost(ghost, dt));
+    if (game.powerTimer > 0) {
+      game.powerTimer = Math.max(0, game.powerTimer - dt);
+      if (game.powerTimer === 0) game.ghosts.forEach((ghost) => { ghost.frightImmune = false; ghost.cachedPath = []; });
+    }
     checkGameCollision();
     renderGameHUD();
   }
@@ -2245,14 +2295,17 @@
   }
 
   function drawGhost(ghost, x, y, radius) {
+    const frightened = ghost.state === "FRIGHTENED" && game.powerTimer > 0 && !ghost.frightImmune;
     const sprite = ghost.index === 0 ? sprites.ghostCoral : sprites.ghostBlue;
-    if (sprite.complete && sprite.naturalWidth) {
+    if (!frightened && sprite.complete && sprite.naturalWidth) {
       const size = radius * 2.55;
       const bob = Math.sin(performance.now() / 170 + ghost.index) * radius * .055;
       gameCtx.drawImage(sprite, x - size / 2, y - size / 2 + bob, size, size);
       return;
     }
-    gameCtx.fillStyle = ghost.color;
+    // Frightened ghosts flash white when the power coin is about to run out.
+    const flashing = frightened && game.powerTimer < 2 && Math.floor(performance.now() / 180) % 2 === 0;
+    gameCtx.fillStyle = frightened ? (flashing ? "#e8ecff" : "#3646c8") : ghost.color;
     gameCtx.beginPath(); gameCtx.arc(x,y-radius*.15,radius,Math.PI,0); gameCtx.lineTo(x+radius,y+radius);
     gameCtx.lineTo(x+radius*.5,y+radius*.65); gameCtx.lineTo(x,y+radius); gameCtx.lineTo(x-radius*.5,y+radius*.65); gameCtx.lineTo(x-radius,y+radius); gameCtx.closePath(); gameCtx.fill();
     const eyeX = ghost.dir.x * radius * .12, eyeY = ghost.dir.y * radius * .12;
@@ -2312,6 +2365,8 @@
     pelletLow: [[0, 620, .028, "square", .014]],
     pelletHigh: [[0, 790, .028, "square", .014]],
     coin: [[0, 660, .05, "triangle", .03], [60, 880, .07, "triangle", .032], [130, 1320, .1, "triangle", .03]],
+    power: [[0, 520, .07, "square", .028], [85, 700, .08, "square", .03], [175, 940, .12, "triangle", .034]],
+    ghostEaten: [[0, 900, .05, "triangle", .03], [60, 1300, .08, "triangle", .034], [150, 520, .07, "square", .022]],
     pause: [[0, 430, .05, "triangle", .02], [70, 300, .08, "triangle", .018]],
     resume: [[0, 300, .05, "triangle", .018], [70, 480, .08, "triangle", .022]],
     patrol: [[0, 260, .07, "sine", .016]],

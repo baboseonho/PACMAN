@@ -225,14 +225,14 @@ else:                    PATROL</code></pre></div>
         </div>
         <div class="ghost-monitor" id="ghostMonitor"></div>
         <div class="ai-feature-list" id="aiFeatureList"></div>
-        <p class="game-note">The game runtime mirrors the validated Python logic: FSM chooses the state, CHASE calls Dijkstra, and <code>path[1]</code> becomes the ghost's next tile. Green slime tiles cost 2, so ghosts cross them at half speed — Pac-Man hops over them freely.</p>
+        <p class="game-note">The game runtime mirrors the validated Python logic: FSM chooses the state, CHASE calls Dijkstra, and <code>path[1]</code> becomes the ghost's next tile. Green slime tiles cost 2, so ghosts cross them at half speed — Pac-Man hops over them freely. Gold power coins appear at random: eat one and the ghosts turn blue and flee — catch them to send them back to their spawn for 200 points.</p>
       </section>
 
       <section id="buildLab" class="lab-view" role="tabpanel" aria-labelledby="buildTab" hidden>
         <div class="matrix-lab-head">
           <span class="card-label">Level designer</span>
           <h3>Design your own maze</h3>
-          <p>Pick a tool and drag on the grid. An automatic border wall surrounds the board, every open tile gets a pellet, slime slows ghosts to half speed, and coins are 50-point bonus pickups. A level only starts when both ghosts can reach Pac-Man.</p>
+          <p>Pick a tool and drag on the grid. An automatic border wall surrounds the board, every open tile gets a pellet, and slime slows ghosts to half speed. A few pellets become power coins at random — eat one and you can hunt the ghosts. A level only starts when both ghosts can reach Pac-Man.</p>
         </div>
         <div class="build-controls">
           <label class="build-size" for="buildSize">Size
@@ -245,7 +245,6 @@ else:                    PATROL</code></pre></div>
           <button class="build-tool active" data-tool="wall"><i class="tool-chip chip-wall"></i>Wall</button>
           <button class="build-tool" data-tool="floor"><i class="tool-chip chip-floor"></i>Floor</button>
           <button class="build-tool" data-tool="slime"><i class="tool-chip chip-slime"></i>Slime</button>
-          <button class="build-tool" data-tool="coin"><i class="tool-chip chip-coin"></i>Coin</button>
           <button class="build-tool" data-tool="pacman"><img src="assets/maze-runner-open.svg" alt="">P</button>
           <button class="build-tool" data-tool="g1"><img src="assets/ghost-coral.svg" alt="">G1</button>
           <button class="build-tool" data-tool="g2"><img src="assets/ghost-blue.svg" alt="">G2</button>
