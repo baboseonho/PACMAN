@@ -39,7 +39,7 @@
   let toastTimer = null;
 
   function emptyProfile() {
-    return { current: 0, completed: [], skipped: [], attempts: {}, hints: {}, drafts: {}, studentMapCode: "", gameMapIndex: 0, playground: null, playgroundPlayed: false };
+    return { current: 0, completed: [], skipped: [], attempts: {}, hints: {}, drafts: {}, studentMapCode: "", gameMapIndex: 0, playground: null, playgroundPlayed: false, fsmRanges: null };
   }
 
   function loadStore() {
@@ -653,6 +653,13 @@
     if (wasSkipped) p.skipped = p.skipped.filter((id) => id !== item.id);
     const newlyCompleted = !p.completed.includes(item.id);
     if (newlyCompleted) p.completed.push(item.id);
+    // Mission 11 constants tune the live game: store the student's ranges.
+    if (item.id === "integration") {
+      const compactAnswer = compact(answer);
+      const attackDef = compactAnswer.match(/attack_range=(\d+)/);
+      const chaseDef = compactAnswer.match(/chase_range=(\d+)/);
+      if (attackDef && chaseDef) p.fsmRanges = { attack: Number(attackDef[1]), chase: Number(chaseDef[1]) };
+    }
     if (matrixResult) {
       p.studentMapCode = answer;
       p.gameMapIndex = 2;
@@ -664,7 +671,8 @@
     }
     els.nextBtn.disabled = false;
     if (task.type === "build") updateBuildChecklist();
-    setFeedback("success", matrixResult ? `Playable Student map saved. P ${matrixResult.pacmanPos.join(",")}; G1 ${matrixResult.ghostPositions[0].join(",")}; G2 ${matrixResult.ghostPositions[1].join(",")}. Open Play Lab and choose Student map.` : (task.success || "Correct. The logic matches the lecture and the mission is complete."));
+    const rangeNote = item.id === "integration" && p.fsmRanges ? `\n\nLive game ranges applied: ATTACK < ${p.fsmRanges.attack} · CHASE < ${p.fsmRanges.chase} units.` : "";
+    setFeedback("success", matrixResult ? `Playable Student map saved. P ${matrixResult.pacmanPos.join(",")}; G1 ${matrixResult.ghostPositions[0].join(",")}; G2 ${matrixResult.ghostPositions[1].join(",")}. Open Play Lab and choose Student map.` : (task.success || "Correct. The logic matches the lecture and the mission is complete.") + rangeNote);
     renderProgress();
     renderNav();
     renderGameHUD();
@@ -947,18 +955,34 @@
       return new RegExp(`len\\(${path}\\)>1`).test(c) && new RegExp(`return${path}\\[1\\]`).test(c) && new RegExp(`return${position}(?:\\n|$)`).test(c);
     }
     if (kind === "integration") {
-      const state = orderedStates();
-      if (!state) return false;
-      const chaseBlock = c.lastIndexOf(`${state.target}=="chase"`);
+      // Ranges must be named constants so students can tune them.
+      const attackDef = c.match(/attack_range=(\d+)/);
+      const chaseDef = c.match(/chase_range=(\d+)/);
+      if (!attackDef || !chaseDef) return false;
+      const attackValue = Number(attackDef[1]), chaseValue = Number(chaseDef[1]);
+      if (!(attackValue > 0 && chaseValue > attackValue)) return false;
+      const first = c.match(/if([a-z_]\w*)<attack_range:/);
+      if (!first) return false;
+      const distanceName = first[1];
+      const attackAssign = c.slice(first.index).match(/([a-z_][a-z0-9_.]*)="attack"/);
+      if (!attackAssign) return false;
+      const target = attackAssign[1];
+      const attackAt = first.index + attackAssign.index;
+      const chaseCondition = c.indexOf(`elif${distanceName}<chase_range:`, attackAt);
+      const chaseAt = c.indexOf(`${target}="chase"`, chaseCondition);
+      const fallback = c.indexOf("else:", chaseAt);
+      const patrolAt = c.indexOf(`${target}="patrol"`, fallback);
+      if (!(chaseCondition > attackAt && chaseAt > chaseCondition && fallback > chaseAt && patrolAt > fallback)) return false;
+      const chaseBlock = c.lastIndexOf(`${target}=="chase"`);
       if (chaseBlock < 0) return false;
       const afterChase = c.slice(chaseBlock);
       // Canonical answer: reuse the Mission 10 function inside CHASE.
       if (/([a-z_]\w*)=update_ghost\(([a-z_]\w*),\1,([a-z_]\w*)\)/.test(afterChase)) return true;
-      // Legacy long form (find_path → length check → path[1]) is still accepted.
+      // Long form (find_path → length check → path[1]) is still accepted.
       const findText = afterChase.match(/([a-z_]\w*)=find_path\(([a-z_]\w*),([a-z_]\w*),([a-z_]\w*)\)/);
       if (!findText) return false;
       const path = escaped(findText[1]), position = escaped(findText[3]);
-      const afterFind = c.slice(chaseBlock + findText.index);
+      const afterFind = afterChase.slice(findText.index);
       return new RegExp(`len\\(${path}\\)>1`).test(afterFind) && new RegExp(`${position}=${path}\\[1\\]`).test(afterFind);
     }
     return false;
@@ -1043,8 +1067,14 @@
       need(c.includes("returnghost_pos"), "The no-path fallback return is missing or incorrect.");
     }
     if (kind === "integration") {
-      const d50 = c.indexOf("distance<50"), d200 = c.indexOf("distance<200");
-      need(d50 >= 0 && d200 >= 0 && d50 < d200, "The FSM transition conditions are missing or in the wrong order.");
+      const attackDef = c.match(/attack_range=(\d+)/), chaseDef = c.match(/chase_range=(\d+)/);
+      need(Boolean(attackDef), "Define `ATTACK_RANGE = <number>` at the top.");
+      need(Boolean(chaseDef), "Define `CHASE_RANGE = <number>` at the top.");
+      if (attackDef && chaseDef) need(Number(attackDef[1]) > 0 && Number(chaseDef[1]) > Number(attackDef[1]), "Keep 0 < ATTACK_RANGE < CHASE_RANGE so the specific range stays inside the wide one.");
+      const attackUse = c.indexOf("<attack_range"), chaseUse = c.indexOf("<chase_range");
+      need(attackUse >= 0, "Compare with the variable: `distance < ATTACK_RANGE`, not a raw number.");
+      need(chaseUse >= 0, "Compare with the variable: `distance < CHASE_RANGE`, not a raw number.");
+      if (attackUse >= 0 && chaseUse >= 0) need(attackUse < chaseUse, "Check the specific `< ATTACK_RANGE` before the wider `< CHASE_RANGE`.");
       need(c.includes('ghost.state=="chase"'), "The CHASE-only navigation condition is missing or incorrect.");
       const hasReuse = c.includes("ghost_pos=update_ghost(map_data,ghost_pos,pacman_pos)");
       const hasInline = c.includes("find_path(map_data,ghost_pos,pacman_pos)") && c.includes("len(path)>1") && c.includes("ghost_pos=path[1]");
@@ -1992,8 +2022,12 @@
     const distance = (Math.abs(ghostRow - playerRow) + Math.abs(ghostCol - playerCol)) * 25;
     ghost.distance = distance;
     if (!complete.has("conditions") || !complete.has("distance")) return "PATROL";
-    if (distance < 50) return "ATTACK";
-    if (distance < 200) return "CHASE";
+    // Mission 11 lets students tune these constants; defaults match the lecture.
+    const ranges = profile().fsmRanges || {};
+    const attackRange = Number(ranges.attack) > 0 ? Number(ranges.attack) : 50;
+    const chaseRange = Number(ranges.chase) > attackRange ? Number(ranges.chase) : Math.max(200, attackRange + 1);
+    if (distance < attackRange) return "ATTACK";
+    if (distance < chaseRange) return "CHASE";
     return "PATROL";
   }
 

@@ -221,22 +221,22 @@ const COURSE_MISSIONS = [
   },
   {
     id: "integration", phase: "11 · INTEGRATION", nav: "FSM + Dijkstra", title: "Combine decision and pathfinding",
-    lead: "FSM answers when to chase. Dijkstra answers which path to take. A smart monster runs pathfinding only while its state is CHASE — and you already wrote that pathfinding step as `update_ghost()` in Mission 10.",
-    icon: "AI", conceptTitle: "Decision layer + navigation layer (reuse!)",
-    conceptText: "First update the state from distance. Then, only in CHASE, reuse `update_ghost()` from Mission 10 — it already recalculates the path, checks the length, and returns the next tile. Calling tested functions instead of retyping their code is how real game code is built.", lab: "path",
+    lead: "FSM answers when to chase. Dijkstra answers which path to take. Define the ranges as named constants, reuse `update_ghost()` from Mission 10 — and then tune the numbers to redesign your monster's personality.",
+    icon: "AI", conceptTitle: "Decision layer + navigation layer + tunable constants",
+    conceptText: "First update the state from distance using your ATTACK_RANGE and CHASE_RANGE constants, then — only in CHASE — reuse `update_ghost()` from Mission 10. A bigger CHASE_RANGE makes a more paranoid monster; a bigger ATTACK_RANGE makes it deadlier up close. After passing, change the numbers and check again: the live game adopts your values.", lab: "path",
     codeReference: [
+      ["ATTACK_RANGE / CHASE_RANGE", "Tunable named constants. The conditions compare against these names, so changing one number redesigns the whole FSM — and the playable ghosts use your values."],
       ["get_distance(...)", "Calculates the value used by the FSM transition conditions."],
       ["ghost.state", "Stores the decision made by the FSM."],
-      ["update_ghost(map_data, ghost_pos, pacman_pos)", "Your Mission 10 function: recalculates the path and returns the next tile, or the current position when no route exists."],
-      ["ghost_pos = update_ghost(...)", "Moves the ghost exactly one tile by reusing the function instead of retyping find_path and the length check."]
+      ["update_ghost(map_data, ghost_pos, pacman_pos)", "Your Mission 10 function: recalculates the path and returns the next tile, or the current position when no route exists."]
     ],
     time: 5,
     task: {
       taskTitle: "Implement the complete smart-monster update", type: "code", validator: "integration",
-      prompt: "Write one update block that selects ATTACK below 50, CHASE below 200, PATROL otherwise, and — only in CHASE — moves the ghost by calling `update_ghost(map_data, ghost_pos, pacman_pos)`.",
-      starter: "distance = get_distance(ghost_pos, pacman_pos)\n",
-      success: "Correct. FSM decides when to hunt, and your own Mission 10 function decides where to step — decision layer plus navigation layer, connected by reuse. Your smart monster is complete!",
-      hints: ["Finish the FSM before the CHASE movement block.", "The specific `< 50` condition must appear before `< 200`.", "In CHASE: `ghost_pos = update_ghost(map_data, ghost_pos, pacman_pos)` — the function already handles find_path and the length check."]
+      prompt: "Keep the ATTACK_RANGE and CHASE_RANGE constants on top and use them in the FSM: ATTACK below ATTACK_RANGE, CHASE below CHASE_RANGE, PATROL otherwise. Only in CHASE, call `update_ghost(map_data, ghost_pos, pacman_pos)`. After it passes, change the range numbers and press Check answer again — the ghosts in the Play lab switch to your values.",
+      starter: "ATTACK_RANGE = 50\nCHASE_RANGE = 200\n\ndistance = get_distance(ghost_pos, pacman_pos)\n",
+      success: "Correct. FSM decides when using YOUR ranges, and your Mission 10 function decides where to step. Now experiment: try ATTACK_RANGE = 100 or CHASE_RANGE = 300, check again, and watch the ghosts change personality in the Play lab.",
+      hints: ["Keep 0 < ATTACK_RANGE < CHASE_RANGE and compare with the variables, not raw numbers.", "The specific `< ATTACK_RANGE` condition must come before `< CHASE_RANGE`.", "In CHASE: `ghost_pos = update_ghost(map_data, ghost_pos, pacman_pos)`. Then tune the ranges and re-check to update the game."]
     }
   },
   {
