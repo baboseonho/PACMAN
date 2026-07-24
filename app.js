@@ -39,7 +39,7 @@
   let toastTimer = null;
 
   function emptyProfile() {
-    return { current: 0, completed: [], skipped: [], attempts: {}, hints: {}, drafts: {}, studentMapCode: "", gameMapIndex: 0, playground: null, playgroundPlayed: false, fsmRanges: null };
+    return { current: 0, completed: [], skipped: [], attempts: {}, hints: {}, drafts: {}, studentMapCode: "", gameMapIndex: 0, playground: null, playgroundPlayed: false, fsmRanges: null, dijkstraLabDone: false };
   }
 
   function loadStore() {
@@ -633,20 +633,26 @@
       return;
     }
 
-    const labStepsRemaining = [];
-    if (task.requiresEdits && pathState.mapIndex !== 1) {
-      labStepsRemaining.push("Select the WEIGHTED map. The currently selected map is not WEIGHTED.");
-    } else if (task.requiresEdits && pathState.editedCells.size < task.requiresEdits) {
-      labStepsRemaining.push(`Edit ${task.requiresEdits} different floor tiles. Current progress: ${pathState.editedCells.size}/${task.requiresEdits}.`);
-    }
-    if (task.requiresLab && !pathState.done) {
-      labStepsRemaining.push("Press Run and wait until the final green path appears.");
-    }
-    if (labStepsRemaining.length) {
-      saveStore();
-      setFeedback("hint", "Your Python code is correct. Finish the Path Lab before the mission is marked complete:\n• " + labStepsRemaining.join("\n• "));
-      openLab("path");
-      return;
+    // The lab requirement is only enforced until it has been completed once; the
+    // completion is persisted (dijkstraLabDone) so a correct answer keeps passing
+    // after a reload or map change instead of failing on volatile pathState.
+    if (task.requiresLab && !profile().dijkstraLabDone) {
+      const labStepsRemaining = [];
+      if (task.requiresEdits && pathState.mapIndex !== 1) {
+        labStepsRemaining.push("Select the WEIGHTED map. The currently selected map is not WEIGHTED.");
+      } else if (task.requiresEdits && pathState.editedCells.size < task.requiresEdits) {
+        labStepsRemaining.push(`Edit ${task.requiresEdits} different floor tiles. Current progress: ${pathState.editedCells.size}/${task.requiresEdits}.`);
+      }
+      if (!pathState.done) {
+        labStepsRemaining.push("Press Run and wait until the final green path appears.");
+      }
+      if (labStepsRemaining.length) {
+        saveStore();
+        setFeedback("hint", "Your Python code is correct. Finish the Path Lab once before the mission is marked complete:\n• " + labStepsRemaining.join("\n• "));
+        openLab("path");
+        return;
+      }
+      profile().dijkstraLabDone = true;
     }
 
     const wasSkipped = (p.skipped || []).includes(item.id);
@@ -1402,6 +1408,12 @@
       pathState.path = tracePath();
       pathState.done = true;
       pathState.message = `Goal finalized. Lowest total cost = ${pathState.distances.get(picked)}.`;
+      // Persist the Mission 8 lab requirement once met, so a correct answer keeps
+      // passing after a reload even though pathState is volatile.
+      if (pathState.mapIndex === 1 && pathState.editedCells.size >= 3 && !profile().dijkstraLabDone) {
+        profile().dijkstraLabDone = true;
+        saveStore();
+      }
       stopAuto();
       renderPath();
       return;
@@ -2020,10 +2032,14 @@
     const complete = completedSet();
     const ghostRow = Math.floor(ghost.y), ghostCol = Math.floor(ghost.x);
     const playerRow = Math.floor(game.player.y), playerCol = Math.floor(game.player.x);
-    // 12 units per tile: with the default ranges CHASE engages within ~16 tiles
-    // (most of the maze) and ATTACK within ~4 tiles, so ghosts visibly hunt.
-    const distance = (Math.abs(ghostRow - playerRow) + Math.abs(ghostCol - playerCol)) * 12;
-    ghost.distance = distance;
+    const tiles = Math.abs(ghostRow - playerRow) + Math.abs(ghostCol - playerCol);
+    // Normalize distance to a 0..~300 scale from the map's own size, so the 50/200
+    // ranges (and any student-tuned values) feel the same on small and large maps:
+    // a ghost in the far third patrols, mid-range chases, and very close attacks.
+    const rows = game.map.length || 1, cols = (game.map[0] && game.map[0].length) || 1;
+    const maxTiles = Math.max(1, (rows - 1) + (cols - 1));
+    const distance = tiles * (300 / maxTiles);
+    ghost.distance = Math.round(distance);
     if (!complete.has("conditions") || !complete.has("distance")) return "PATROL";
     // Mission 11 lets students tune these constants; defaults match the lecture.
     const ranges = profile().fsmRanges || {};
