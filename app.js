@@ -1824,8 +1824,9 @@
   }));
 
   function completedSet() {
-    const skipped = new Set(profile().skipped || []);
-    return new Set(profile().completed.filter((id) => !skipped.has(id)));
+    // Skipped missions also power the game (skip pushes the id into `completed`),
+    // so the final play always works even if a student skips a mission.
+    return new Set(profile().completed);
   }
 
   function fullStudentAIReady() {
@@ -2372,7 +2373,7 @@
     els.runtimeStatus.querySelector("strong").textContent = ready ? "FSM → CHASE → Dijkstra → path[1]" : `AI build in progress · ${complete.size}/${TOTAL}`;
     els.runtimeStatus.querySelector("small").textContent = ready
       ? "PATROL explores junctions, CHASE recalculates the lowest-cost path, and ATTACK applies direct pressure."
-      : "Only correctly submitted missions power the ghosts; skipped missions remain inactive.";
+      : "Each completed mission powers the ghosts. Skipped missions count too, so the final play always works.";
   }
 
   function gameLoop(time) {
